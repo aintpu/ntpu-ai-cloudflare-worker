@@ -2428,13 +2428,11 @@
       cfgForceTiny:     "強制開源小模型",
       saveBtn:          "儲存設定",
       cfgSaved:         "✓ 設定已儲存，約 30 秒後生效",
-      statsRange:       "有效 Session 為同一對話至少提出 3 個問題；Token 量含 judge 模型消耗",
+      statsRange:       "所有 Session 都會記錄；同一對話完成 3 題後才顯示滿意度問卷。Token 量含 judge 模型消耗",
       statsEmpty:       "此區間尚無使用記錄",
       statsLoading:     "載入中…",
-      statsCols:        ["使用者／訪客","有效 Session","次數","小模型","中模型","大模型","輸入 Token","輸出 Token","總 Token"],
+      statsCols:        ["使用者／訪客","Session","次數","小模型","中模型","大模型","輸入 Token","輸出 Token","總 Token"],
       statsGuest:       "訪客",
-      statsRevealGuest: "還原 ID",
-      statsRevealFail:  "無法還原：",
       statsDownload:    "下載 CSV 報告",
       statsDownloading: "產生報告中…",
       statsDownloadFail:"報告下載失敗：",
@@ -2625,13 +2623,11 @@
       cfgForceTiny:     "Force open-source model",
       saveBtn:          "Save Settings",
       cfgSaved:         "✓ Settings saved. Takes effect in ~30 seconds.",
-      statsRange:       "A valid session has at least 3 questions in one chat; token counts include judge usage",
+      statsRange:       "Every session is recorded; the satisfaction survey appears after 3 questions. Token counts include judge usage",
       statsEmpty:       "No usage in this range",
       statsLoading:     "Loading…",
-      statsCols:        ["User / Guest","Valid Sessions","Requests","Small","Medium","Large","Input Tokens","Output Tokens","Total Tokens"],
+      statsCols:        ["User / Guest","Sessions","Requests","Small","Medium","Large","Input Tokens","Output Tokens","Total Tokens"],
       statsGuest:       "Guest",
-      statsRevealGuest: "Reveal ID",
-      statsRevealFail:  "Unable to reveal: ",
       statsDownload:    "Download CSV report",
       statsDownloading: "Preparing report…",
       statsDownloadFail:"Report download failed: ",
@@ -3032,13 +3028,13 @@
         ].map(_csvCell),
         [],
         (zh
-          ? ["使用者／訪客","類型","有效 Session（至少 3 題）","請求數","小模型","中模型","大模型","開源模型","輸入 Token","輸出 Token","總 Token"]
-          : ["User / Guest","Type","Valid Sessions (3+ questions)","Requests","Small","Medium","Large","Open-source","Input Tokens","Output Tokens","Total Tokens"]
+          ? ["使用者／訪客","類型","Session","請求數","小模型","中模型","大模型","開源模型","輸入 Token","輸出 Token","總 Token"]
+          : ["User / Guest","Type","Sessions","Requests","Small","Medium","Large","Open-source","Input Tokens","Output Tokens","Total Tokens"]
         ).map(_csvCell),
       ];
       for (const u of (data.users || [])) {
         const label = u.is_guest
-          ? `${t("statsGuest")} #${String(u.uid || "").split(":").pop().slice(0, 12)}`
+          ? `${t("statsGuest")} #${String(u.uid || "").split(":").pop()}`
           : (u.email || u.uid);
         const values = [
           label, u.is_guest ? (zh ? "訪客" : "Guest") : (zh ? "登入者" : "Signed-in"),
@@ -3065,7 +3061,7 @@
       ).map(_csvCell));
       for (const item of (data.feedback || [])) {
         const label = item.is_guest
-          ? `${t("statsGuest")} #${String(item.uid || "").split(":").pop().slice(0, 12)}`
+          ? `${t("statsGuest")} #${String(item.uid || "").split(":").pop()}`
           : (item.email || item.uid);
         lines.push([
           label, item.is_guest ? (zh ? "訪客" : "Guest") : (zh ? "登入者" : "Signed-in"),
@@ -3117,13 +3113,10 @@
         totalReqs += u.total; totalConvs += (u.conversations || 0);
         totalIn += u.input_tokens; totalOut += u.output_tokens;
         const accountLabel = u.is_guest
-          ? `${t("statsGuest")} #${String(u.uid || "").split(":").pop().slice(0, 12)}`
+          ? `${t("statsGuest")} #${String(u.uid || "").split(":").pop()}`
           : (u.email || u.uid);
-        const revealButton = u.is_guest
-          ? ` <button type="button" class="action-btn" style="margin-left:8px" onclick="revealGuestId('${_esc(u.uid)}', this)">${t("statsRevealGuest")}</button>`
-          : "";
         return `<tr>
-          <td><span>${_esc(accountLabel)}</span>${revealButton}</td>
+          <td><span>${_esc(accountLabel)}</span></td>
           <td style="text-align:center">${u.conversations || 0}</td>
           <td style="text-align:center;font-weight:600">${u.total}</td>
           <td style="text-align:center">${u.small || 0}</td>
@@ -3194,30 +3187,6 @@
         ${modelTable}`;
     } catch (e) {
       el.innerHTML = `<div class="a-notice" style="color:var(--danger)">${t("loadingFail")}${e.message}</div>`;
-    }
-  }
-
-  async function revealGuestId(statsUid, button) {
-    if (!currentUser || !button) return;
-    button.disabled = true;
-    try {
-      const token = await currentUser.getIdToken();
-      const res = await fetch(`${BASE_URL}/admin/guest-id/${encodeURIComponent(statsUid)}`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        let detail = "HTTP " + res.status;
-        try { detail = (await res.json()).detail || detail; } catch (_) {}
-        throw new Error(detail);
-      }
-      const data = await res.json();
-      const code = document.createElement("code");
-      code.textContent = data.guest_id;
-      code.title = statsUid;
-      button.replaceWith(code);
-    } catch (e) {
-      button.disabled = false;
-      alert(t("statsRevealFail") + e.message);
     }
   }
 
@@ -3420,7 +3389,7 @@
         ["answer","SSE 串流","Token 串流回瀏覽器，之後背景寫入用量及符合條件的登入者對話。"],
       ],
       details: [
-        ["身分識別","登入者使用 Worker HMAC 權杖；訪客統計使用 SHA-256 假名 ID，另以 AES-GCM 加密保存可還原 ID。"],
+        ["身分識別","登入者使用 Worker HMAC 權杖；訪客統計直接使用瀏覽器產生的隨機訪客 ID。"],
         ["資料儲存","Cloudflare D1 保存登入者 Session、用量與 CSAT；R2 隔離保存附件；訪客對話文字不落地。"],
         ["統計定義","每個 Session ID 從第 1 個完成請求起就會計數；累積 3 題後才符合問卷資格，CSAT 以 4–5 分計算。"],
       ],

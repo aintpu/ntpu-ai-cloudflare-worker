@@ -2,7 +2,7 @@ import { authenticate, requestMagicLink, requireAdmin, verifyMagicLink } from ".
 import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
 import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE } from "./models.js";
-import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders, sha256 } from "./utils.js";
+import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders } from "./utils.js";
 
 const owner = async (req, env) => authenticate(req, env);
 const pathMatch = (path, re) => path.match(re);
@@ -90,12 +90,21 @@ export async function adminStats(env, url) {
     env.DB.prepare("SELECT * FROM usage_logs WHERE created_at>=? AND created_at<? ORDER BY created_at DESC LIMIT 20000").bind(start, end),
     env.DB.prepare("SELECT * FROM feedback WHERE created_at>=? AND created_at<? ORDER BY created_at DESC LIMIT 20000").bind(start, end),
   ]);
-  const userMap = new Map(), sessionMap = new Map(), modelMap = new Map();
+  const userMap = new Map(), sessionMap = new Map(), modelMap = new Map(), legacyGuestUidMap = new Map();
   for (const row of usageResult.results || []) {
-    if (!userMap.has(row.stats_uid)) userMap.set(row.stats_uid, { uid: row.stats_uid, email: row.email || "", is_guest: row.access_type === "guest" || row.stats_uid.startsWith("guest:"), total: 0, conversations: 0, small: 0, medium: 0, large: 0, tiny: 0, input_tokens: 0, output_tokens: 0 });
-    const user = userMap.get(row.stats_uid); user.total++; user.input_tokens += row.input_tokens || 0; user.output_tokens += row.output_tokens || 0;
+    let statsUid = row.stats_uid;
+    if (legacyGuestUidMap.has(row.stats_uid)) {
+      statsUid = legacyGuestUidMap.get(row.stats_uid);
+    } else if (row.access_type === "guest" && row.guest_id_encrypted && env.GUEST_ID_ENCRYPTION_KEY) {
+      try {
+        statsUid = `guest:${await aesDecrypt(row.guest_id_encrypted, env.GUEST_ID_ENCRYPTION_KEY, row.stats_uid)}`;
+        legacyGuestUidMap.set(row.stats_uid, statsUid);
+      } catch { /* Keep the legacy pseudonymous ID if old ciphertext cannot be opened. */ }
+    }
+    if (!userMap.has(statsUid)) userMap.set(statsUid, { uid: statsUid, email: row.email || "", is_guest: row.access_type === "guest" || statsUid.startsWith("guest:"), total: 0, conversations: 0, small: 0, medium: 0, large: 0, tiny: 0, input_tokens: 0, output_tokens: 0 });
+    const user = userMap.get(statsUid); user.total++; user.input_tokens += row.input_tokens || 0; user.output_tokens += row.output_tokens || 0;
     if (["small","medium","large","tiny"].includes(row.route)) user[row.route]++;
-    const sessionKey = `${row.stats_uid}\u0000${row.session_id}`; sessionMap.set(sessionKey, (sessionMap.get(sessionKey) || 0) + 1);
+    const sessionKey = `${statsUid}\u0000${row.session_id}`; sessionMap.set(sessionKey, (sessionMap.get(sessionKey) || 0) + 1);
     const addModel = (name, input, output) => {
       if (!name) return;
       if (!modelMap.has(name)) modelMap.set(name, { model:name, requests:0, input_tokens:0, output_tokens:0 });
@@ -114,7 +123,7 @@ export async function adminStats(env, url) {
   const users = [...userMap.values()].sort((a,b) => b.total-a.total);
   const by_model = [...modelMap.values()].sort((a,b) => (b.input_tokens+b.output_tokens)-(a.input_tokens+a.output_tokens));
   const distribution = { "1":0,"2":0,"3":0,"4":0,"5":0 }; let sum=0, positive=0;
-  const feedback = (feedbackResult.results || []).filter(x => x.rating>=1 && x.rating<=5).map(x => { distribution[String(x.rating)]++; sum+=x.rating; if(x.rating>=4)positive++; return { uid:x.stats_uid,email:x.email||"",is_guest:!!x.is_guest,session_id:x.session_id,rating:x.rating,question_count:x.question_count||0,timestamp:x.created_at }; });
+  const feedback = (feedbackResult.results || []).filter(x => x.rating>=1 && x.rating<=5).map(x => { distribution[String(x.rating)]++; sum+=x.rating; if(x.rating>=4)positive++; return { uid:legacyGuestUidMap.get(x.stats_uid)||x.stats_uid,email:x.email||"",is_guest:!!x.is_guest,session_id:x.session_id,rating:x.rating,question_count:x.question_count||0,timestamp:x.created_at }; });
   const responses=feedback.length;
   return { users, by_model, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
 }
@@ -124,7 +133,6 @@ async function admin(req, env, url) {
   if (p === "/admin/setup") return json({ ok: true });
   if (p === "/admin/config") { if (req.method === "GET") { const row = await env.DB.prepare("SELECT value_json FROM app_config WHERE key='routing'").first(); return json({threshold_tiny:null,threshold_medium:4,threshold_large:7,force_model:null,prefer_local:false,...safeJson(row?.value_json || "{}", {})}); } const body = await req.json(); const force=body.force_model; if(force && !["small","medium","large","tiny"].includes(force) && !MODEL_TO_ROUTE[force])return error(`模型 ${force} 尚未在目前環境註冊`,400); await env.DB.prepare("INSERT INTO app_config VALUES('routing',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at").bind(JSON.stringify(body), nowIso()).run(); return json({ ok: true }); }
   if (p === "/admin/stats") return json(await adminStats(env, url));
-  const reveal = pathMatch(p, /^\/admin\/guest-id\/(guest:[a-z0-9_-]{16})$/i); if (reveal) { const row = await env.DB.prepare("SELECT guest_id_encrypted FROM usage_logs WHERE stats_uid=? AND guest_id_encrypted<>'' ORDER BY id DESC LIMIT 1").bind(reveal[1]).first(); if (!row) return error("找不到識別碼",404); return json({ stats_uid: reveal[1], guest_id: await aesDecrypt(row.guest_id_encrypted, env.GUEST_ID_ENCRYPTION_KEY, reveal[1]) }); }
   if (p === "/admin/users" && req.method === "GET") { const rows = await env.DB.prepare("SELECT uid,email,is_admin,created_at,last_login_at FROM users ORDER BY created_at DESC").all(); return json(rows.results || []); }
   const toggle = pathMatch(p, /^\/admin\/users\/([^/]+)\/toggle-admin$/); if (toggle) { await env.DB.prepare("UPDATE users SET is_admin=? WHERE uid=?").bind(url.searchParams.get("is_admin") === "true" ? 1 : 0, decodeURIComponent(toggle[1])).run(); return json({ ok:true }); }
   const del = pathMatch(p, /^\/admin\/users\/([^/]+)$/); if (del && req.method === "DELETE") { if (decodeURIComponent(del[1]) === user.uid) return error("不能刪除自己",400); await env.DB.prepare("DELETE FROM users WHERE uid=?").bind(decodeURIComponent(del[1])).run(); return json({ok:true}); }
@@ -152,7 +160,7 @@ async function api(req, env) {
   if (p === "/upload" && req.method === "POST") return upload(req,env); if (p === "/file-preview") return preview(req,env,url); if (p === "/transcribe" && req.method === "POST") return transcribe(req,env);
   if (p === "/user/profile") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT system_prompt FROM profiles WHERE uid=?").bind(u.uid).first();return json({system_prompt:x?.system_prompt||""});} const b=await req.json();await env.DB.prepare("INSERT INTO profiles(uid,system_prompt) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET system_prompt=excluded.system_prompt").bind(u.uid,String(b.system_prompt||"").slice(0,10000)).run();return json({ok:true}); }
   if (p === "/user/memory") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT memory FROM profiles WHERE uid=?").bind(u.uid).first();return json({memory:x?.memory||""});} await env.DB.prepare("UPDATE profiles SET memory='',memory_updated_at=NULL WHERE uid=?").bind(u.uid).run();return json({ok:true}); }
-  if (p === "/feedback/session" && req.method === "POST") { const u=await authenticate(req,env,false); const guest=req.headers.get("x-guest-id")||""; if(!u&&!/^[a-f0-9]{32}$/.test(guest))return error("Missing auth token or guest ID",401); const b=await req.json(); const stats=u?.uid || `guest:${(await sha256(guest)).slice(0,16).toLowerCase()}`; const count=u?(await env.DB.prepare("SELECT question_count n FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,b.session_id).first())?.n:(await env.DB.prepare("SELECT COUNT(*) n FROM usage_logs WHERE stats_uid=? AND session_id=?").bind(stats,b.session_id).first())?.n; if(count<3)return error("此對話尚未達到 3 個問題，不能列為有效 session",400);await env.DB.prepare("INSERT INTO feedback(stats_uid,session_id,rating,is_guest,created_at,email,question_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(stats_uid,session_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at,email=excluded.email,question_count=excluded.question_count").bind(stats,b.session_id,b.rating,u?0:1,nowIso(),u?.email||"",count).run();return json({ok:true,question_count:count}); }
+  if (p === "/feedback/session" && req.method === "POST") { const u=await authenticate(req,env,false); const guest=req.headers.get("x-guest-id")||""; if(!u&&!/^[a-f0-9]{32}$/.test(guest))return error("Missing auth token or guest ID",401); const b=await req.json(); const stats=u?.uid || `guest:${guest}`; const count=u?(await env.DB.prepare("SELECT question_count n FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,b.session_id).first())?.n:(await env.DB.prepare("SELECT COUNT(*) n FROM usage_logs WHERE stats_uid=? AND session_id=?").bind(stats,b.session_id).first())?.n; if(count<3)return error("此對話尚未達到 3 個問題，不能列為有效 session",400);await env.DB.prepare("INSERT INTO feedback(stats_uid,session_id,rating,is_guest,created_at,email,question_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(stats_uid,session_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at,email=excluded.email,question_count=excluded.question_count").bind(stats,b.session_id,b.rating,u?0:1,nowIso(),u?.email||"",count).run();return json({ok:true,question_count:count}); }
   const shared=pathMatch(p,/^\/share\/([^/]+)$/); if(shared){const x=await env.DB.prepare("SELECT title,history_json FROM shares WHERE share_id=?").bind(shared[1]).first();return x?json({title:x.title,history:safeJson(x.history_json,[])}):error("分享連結不存在",404);}
   if (p.startsWith("/admin/")) return admin(req,env,url);
   return null;

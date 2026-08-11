@@ -1,4 +1,4 @@
-import { aesEncrypt, json, nowIso, safeJson, sha256, sse } from "./utils.js";
+import { json, nowIso, safeJson, sse } from "./utils.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
 import { classifyDifficulty, loadRoutingConfig } from "./routing.js";
 import { MEMORY_ALIAS, openRouterHeaders, providerModel } from "./models.js";
@@ -39,9 +39,7 @@ async function identity(request, env, authUser) {
   if (authUser) return { uid: authUser.uid, statsUid: authUser.uid, email: authUser.email, guest: false, encrypted: "" };
   const guestId = request.headers.get("x-guest-id") || "";
   if (!/^[a-f0-9]{32}$/.test(guestId)) throw new Response(JSON.stringify({ detail: "Missing auth token or guest ID" }), { status: 401 });
-  const digest = await sha256(guestId);
-  const statsUid = `guest:${digest.slice(0, 16).toLowerCase()}`;
-  return { uid: "anonymous", statsUid, email: "", guest: true, encrypted: await aesEncrypt(guestId, env.GUEST_ID_ENCRYPTION_KEY, statsUid) };
+  return { uid: "anonymous", statsUid: `guest:${guestId}`, email: "", guest: true, encrypted: "" };
 }
 
 async function attachmentContent(req, env, ownerPrefix) {

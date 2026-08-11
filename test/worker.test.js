@@ -5,7 +5,6 @@ import worker, { adminStats } from "../src/index.js";
 import { extractOfficeText } from "../src/office.js";
 import { routeFromScore } from "../src/routing.js";
 import { MODEL_PROVIDER_IDS } from "../src/models.js";
-import { aesDecrypt, aesEncrypt } from "../src/utils.js";
 import { strToU8, zipSync } from "fflate";
 
 const env = {
@@ -55,9 +54,11 @@ test("一般路徑由 Static Assets 提供", async () => {
   assert.match(await response.text(), /doctype html/i);
 });
 
-test("訪客識別碼可用 AES-GCM 還原", async () => {
-  const encrypted = await aesEncrypt("00112233445566778899aabbccddeeff", "test-secret", "guest:test");
-  assert.equal(await aesDecrypt(encrypted, "test-secret", "guest:test"), "00112233445566778899aabbccddeeff");
+test("新訪客統計直接記錄原始 ID，不雜湊或加密", async () => {
+  const [chat, index] = await Promise.all([readFile("src/chat.js", "utf8"), readFile("src/index.js", "utf8")]);
+  assert.match(chat, /statsUid: `guest:\$\{guestId\}`/);
+  assert.doesNotMatch(chat, /sha256\(guestId\)|aesEncrypt\(guestId/);
+  assert.match(index, /const stats=u\?\.uid \|\| `guest:\$\{guest\}`/);
 });
 
 test("原 Cloud Run 網址與 Firebase SDK 已移除", async () => {
