@@ -1,5 +1,6 @@
 import { aesEncrypt, json, nowIso, safeJson, sha256, sse } from "./utils.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
+import { classifyDifficulty, loadRoutingConfig } from "./routing.js";
 
 const SYSTEM = `你是「NTPU AI」，國立臺北大學提供的 AI 助理。不得透露或猜測底層模型與供應商。預設一律使用繁體中文與台灣用語；使用者明確使用其他語言時才跟隨。回答應正確、清楚，資訊不足時坦白說明，不得編造來源。`;
 const MODEL = "gpt-5.6-luna";
@@ -55,7 +56,6 @@ async function attachmentContent(req, env, ownerPrefix) {
 }
 
 export async function streamChat(request, env, authUser) {
-  const startedAt = Date.now();
   if (!env.OPENAI_API_KEY) return new Response(sse({ type: "error", message: "OpenAI 尚未設定" }), { status: 503, headers: { "content-type": "text/event-stream" } });
   const req = await request.json().catch(() => null);
   if (!req) return json({ detail: "請求格式不正確" }, 400);
@@ -80,15 +80,19 @@ export async function streamChat(request, env, authUser) {
   if (req.ntpu_search_enabled) instructions += "\n搜尋校內資訊時，優先且只採用 ntpu.edu.tw 網域的官方資料，回答附來源連結。";
   if (!useSearch) instructions += "\n你目前沒有啟用即時搜尋；需要最新資訊時提醒使用者開啟搜尋。";
   const model = env.OPENAI_MODEL || MODEL;
+  const routingConfig = await loadRoutingConfig(env);
+  const judge = await classifyDifficulty(env, req.message, history, routingConfig, model, !!authUser?.admin);
+  const route = judge.route;
   const searchTool = req.ntpu_search_enabled && !req.search_enabled
     ? { type: "web_search", filters: { allowed_domains: ["ntpu.edu.tw"] } }
     : { type: "web_search" };
+  const answerStartedAt = Date.now();
   const upstream = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify({ model, instructions, input, stream: true, store: false, safety_identifier: who.statsUid, ...(useSearch ? { tools: [searchTool] } : {}) }) });
   if (!upstream.ok || !upstream.body) return new Response(sse({ type: "error", message: "模型服務暫時無法回應" }), { status: 502, headers: { "content-type": "text/event-stream" } });
   const ts = new TransformStream(); const writer = ts.writable.getWriter(); const enc = new TextEncoder();
   const task = (async () => {
     let answer = "", buffer = "", inputTokens = 0, outputTokens = 0;
-    await writer.write(enc.encode(sse({ type: "judge", route: "small", model, judge: { score: 0, route: "small", model, reason: "單一預設模型" }, judge_elapsed_ms: 0 })));
+    await writer.write(enc.encode(sse({ type: "judge", route, model, judge: { score: judge.score, route, model, reason: judge.reason }, judge_model: judge.judge_model, judge_elapsed_ms: judge.judge_elapsed_ms })));
     const reader = upstream.body.getReader(); const dec = new TextDecoder();
     while (true) {
       const { done, value } = await reader.read(); if (done) break; buffer += dec.decode(value, { stream: true });
@@ -103,7 +107,7 @@ export async function streamChat(request, env, authUser) {
     const now = nowIso();
     if (!who.guest) {
       const userMessage = { role: "user", content: req.message, ...(req.file_name ? { _file_name: req.file_name } : {}) };
-      const next = [...fullHistory, userMessage, { role: "assistant", content: answer, _route: "small", _model: model, _score: 0, _reason: "單一預設模型" }];
+      const next = [...fullHistory, userMessage, { role: "assistant", content: answer, _route: route, _model: model, _judge_model: judge.judge_model, _score: judge.score, _reason: judge.reason }];
       const title = String(next.find(x => x.role === "user")?.content || "對話").slice(0, 40);
       await env.DB.prepare("INSERT INTO sessions(uid,session_id,title,history_json,question_count,memory_pending_since,created_at,updated_at) VALUES(?,?,?,?,1,?,?,?) ON CONFLICT(uid,session_id) DO UPDATE SET title=excluded.title,history_json=excluded.history_json,question_count=sessions.question_count+1,memory_pending_since=COALESCE(sessions.memory_pending_since,excluded.memory_pending_since),updated_at=excluded.updated_at")
         .bind(who.uid, req.session_id, title, JSON.stringify(next), pendingSince || now, now, now).run();
@@ -111,9 +115,10 @@ export async function streamChat(request, env, authUser) {
         try { await compressMemory(env, who.uid, req.session_id, next); } catch (e) { console.error("memory compression failed", e); }
       }
     }
-    await env.DB.prepare("INSERT INTO usage_logs(stats_uid,email,session_id,access_type,model,route,score,input_tokens,output_tokens,guest_id_encrypted,created_at) VALUES(?,?,?,?,?,'small',0,?,?,?,?)")
-      .bind(who.statsUid, who.email, req.session_id, who.guest ? "guest" : "authenticated", model, inputTokens, outputTokens, who.encrypted, now).run();
-    await writer.write(enc.encode(sse({ type: "done", answer_elapsed_ms: Date.now() - startedAt }) + "data: [DONE]\n\n")); await writer.close();
+    const totalInput = judge.usage.input_tokens + inputTokens, totalOutput = judge.usage.output_tokens + outputTokens;
+    await env.DB.prepare("INSERT INTO usage_logs(stats_uid,email,session_id,access_type,model,route,score,input_tokens,output_tokens,guest_id_encrypted,created_at,judge_model,judge_input_tokens,judge_output_tokens,answer_input_tokens,answer_output_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(who.statsUid, who.email, req.session_id, who.guest ? "guest" : "authenticated", model, route, judge.score, totalInput, totalOutput, who.encrypted, now, judge.judge_model, judge.usage.input_tokens, judge.usage.output_tokens, inputTokens, outputTokens).run();
+    await writer.write(enc.encode(sse({ type: "done", answer_elapsed_ms: Date.now() - answerStartedAt }) + "data: [DONE]\n\n")); await writer.close();
   })().catch(async () => { try { await writer.write(enc.encode(sse({ type: "error", message: "系統暫時無法回應，請稍後再試" }))); await writer.close(); } catch {} });
   return new Response(ts.readable, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache" } });
 }

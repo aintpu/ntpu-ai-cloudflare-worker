@@ -96,8 +96,15 @@ export async function adminStats(env, url) {
     const user = userMap.get(row.stats_uid); user.total++; user.input_tokens += row.input_tokens || 0; user.output_tokens += row.output_tokens || 0;
     if (["small","medium","large","tiny"].includes(row.route)) user[row.route]++;
     const sessionKey = `${row.stats_uid}\u0000${row.session_id}`; sessionMap.set(sessionKey, (sessionMap.get(sessionKey) || 0) + 1);
-    if (!modelMap.has(row.model)) modelMap.set(row.model, { model: row.model, requests: 0, input_tokens: 0, output_tokens: 0 });
-    const model = modelMap.get(row.model); model.requests++; model.input_tokens += row.input_tokens || 0; model.output_tokens += row.output_tokens || 0;
+    const addModel = (name, input, output) => {
+      if (!name) return;
+      if (!modelMap.has(name)) modelMap.set(name, { model:name, requests:0, input_tokens:0, output_tokens:0 });
+      const item=modelMap.get(name); item.requests++; item.input_tokens+=input||0; item.output_tokens+=output||0;
+    };
+    if (row.judge_model) {
+      addModel(row.judge_model, row.judge_input_tokens, row.judge_output_tokens);
+      addModel(row.model, row.answer_input_tokens, row.answer_output_tokens);
+    } else addModel(row.model, row.input_tokens, row.output_tokens);
   }
   for (const [key, count] of sessionMap) if (count >= 3) userMap.get(key.split("\u0000")[0]).conversations++;
   const users = [...userMap.values()].sort((a,b) => b.total-a.total);
@@ -123,7 +130,7 @@ async function admin(req, env, url) {
 async function api(req, env) {
   const url = new URL(req.url), p = url.pathname;
   if (p === "/health") return json({ status: "ok", runtime: "cloudflare-native", gcp: false });
-  if (p === "/models") { const model = env.OPENAI_MODEL || MODEL; return json({ candidates: { default: [model], small: [model], medium: [model], large: [model] }, notes: { [model]: "OpenAI GPT-5.6 Luna" }, disabled: [] }); }
+  if (p === "/models") { const model = env.OPENAI_MODEL || MODEL; return json({ candidates: { default: [model], small: [model], medium: [model], large: [model] }, judge_model: env.OPENAI_JUDGE_MODEL || model, notes: { [model]: "OpenAI GPT-5.6 Luna" }, disabled: [] }); }
   if (p === "/auth/request-link" && req.method === "POST") {
     const limited = await enforceRateLimit(env, `login:${clientIp(req)}`, 5, 600);
     return limited || requestMagicLink(req, env);

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import worker, { adminStats } from "../src/index.js";
 import { extractOfficeText } from "../src/office.js";
+import { routeFromScore } from "../src/routing.js";
 import { aesDecrypt, aesEncrypt } from "../src/utils.js";
 import { strToU8, zipSync } from "fflate";
 
@@ -23,6 +24,14 @@ test("models 只公開單一預設模型", async () => {
   const body = await response.json();
   assert.deepEqual(body.candidates.default, ["gpt-5.6-luna"]);
   assert.equal(body.notes["gpt-5.6-luna"], "OpenAI GPT-5.6 Luna");
+  assert.equal(body.judge_model, "gpt-5.6-luna");
+});
+
+test("Judge 沿用原版 small / medium / large 難度門檻", () => {
+  const config = { threshold_medium:4, threshold_large:7, threshold_tiny:null };
+  assert.equal(routeFromScore(config, 3), "small");
+  assert.equal(routeFromScore(config, 4), "medium");
+  assert.equal(routeFromScore(config, 7), "large");
 });
 
 test("回答標籤顯示實際模型名稱，不以 NTPU AI 取代", async () => {

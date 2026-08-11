@@ -1,0 +1,5 @@
+ALTER TABLE usage_logs ADD COLUMN judge_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE usage_logs ADD COLUMN judge_input_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usage_logs ADD COLUMN judge_output_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usage_logs ADD COLUMN answer_input_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usage_logs ADD COLUMN answer_output_tokens INTEGER NOT NULL DEFAULT 0;
