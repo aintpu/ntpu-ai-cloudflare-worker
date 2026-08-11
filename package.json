@@ -1,0 +1,16 @@
+{
+  "name": "ntpu-ai-cloudflare-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:check": "wrangler deploy --dry-run",
+    "test": "node --test",
+    "check": "npm run test && npm run deploy:check"
+  },
+  "devDependencies": {
+    "wrangler": "4.120.1"
+  }
+}
