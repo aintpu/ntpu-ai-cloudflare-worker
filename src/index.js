@@ -123,7 +123,7 @@ async function admin(req, env, url) {
 async function api(req, env) {
   const url = new URL(req.url), p = url.pathname;
   if (p === "/health") return json({ status: "ok", runtime: "cloudflare-native", gcp: false });
-  if (p === "/models") { const model = env.OPENAI_MODEL || MODEL; return json({ candidates: { default: [model], small: [model], medium: [model], large: [model] }, notes: { [model]: "NTPU AI 預設模型" }, disabled: [] }); }
+  if (p === "/models") { const model = env.OPENAI_MODEL || MODEL; return json({ candidates: { default: [model], small: [model], medium: [model], large: [model] }, notes: { [model]: "OpenAI GPT-5.6 Luna" }, disabled: [] }); }
   if (p === "/auth/request-link" && req.method === "POST") {
     const limited = await enforceRateLimit(env, `login:${clientIp(req)}`, 5, 600);
     return limited || requestMagicLink(req, env);

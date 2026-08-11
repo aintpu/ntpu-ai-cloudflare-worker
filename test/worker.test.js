@@ -22,6 +22,13 @@ test("models 只公開單一預設模型", async () => {
   const response = await worker.fetch(new Request("https://example.com/models"), env);
   const body = await response.json();
   assert.deepEqual(body.candidates.default, ["gpt-5.6-luna"]);
+  assert.equal(body.notes["gpt-5.6-luna"], "OpenAI GPT-5.6 Luna");
+});
+
+test("回答標籤顯示實際模型名稱，不以 NTPU AI 取代", async () => {
+  const html = await readFile("public/index.html", "utf8");
+  assert.match(html, /short: "GPT-5\.6 Luna"/);
+  assert.doesNotMatch(html, /"gpt-5\.6-luna": \{ cls: "default", short: "NTPU AI"/);
 });
 
 test("一般路徑由 Static Assets 提供", async () => {

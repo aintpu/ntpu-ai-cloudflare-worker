@@ -1778,7 +1778,9 @@
     preview.classList.remove("show");
   }
 
-  const MODEL_META = { "gpt-5.6-luna": { cls: "default", short: "NTPU AI", full: "NTPU AI 預設模型" } };
+  const MODEL_META = {
+    "gpt-5.6-luna": { cls: "small", short: "GPT-5.6 Luna", full: "OpenAI GPT-5.6 Luna" },
+  };
 
   // 從後端 /models 補齊模型清單（唯一來源在 config.py），
   // 之後新增模型（例如地端 local-*）時前端不需要改
