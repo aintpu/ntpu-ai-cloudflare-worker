@@ -30,6 +30,12 @@
       "bucket_name": "ntpu-ai-worker-uploads"
     }
   ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["noreply@ntpu.ai"]
+    }
+  ],
   "observability": {
     "enabled": true
   }
