@@ -1130,7 +1130,7 @@
       <div class="attach-preview" id="attachPreview"></div>
       <div class="input-row">
         <div class="attach-menu-wrap">
-          <button type="button" class="attach-btn" id="attachBtn" title="上傳 / 搜尋"
+          <button type="button" class="attach-btn" id="attachBtn" title="上傳檔案"
                   aria-haspopup="menu" aria-expanded="false" aria-controls="attachMenu">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -1138,14 +1138,6 @@
             <div class="attach-menu-item" id="menuFileItem" role="menuitem">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               <span id="menu-file-label">上傳檔案</span>
-            </div>
-            <div class="attach-menu-item" id="menuSearchItem" role="menuitem">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <span id="menu-search-label">網路搜尋</span><span class="menu-check">✓</span>
-            </div>
-            <div class="attach-menu-item" id="menuNtpuItem" role="menuitem">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
-              <span id="menu-ntpu-label">NTPU 校內搜尋</span><span class="menu-check ntpu-check">✓</span>
             </div>
           </div>
         </div>
@@ -2109,7 +2101,8 @@
     document.getElementById("fileInput").click();
   };
 
-  document.getElementById("menuSearchItem").onclick = (e) => {
+  const menuSearchItem = document.getElementById("menuSearchItem");
+  if (menuSearchItem) menuSearchItem.onclick = (e) => {
     e.stopPropagation();
     if (_searchQuotaExceeded) return;
     _searchEnabled = !_searchEnabled;
@@ -2118,7 +2111,8 @@
     setAttachMenuOpen(false);
   };
 
-  document.getElementById("menuNtpuItem").onclick = (e) => {
+  const menuNtpuItem = document.getElementById("menuNtpuItem");
+  if (menuNtpuItem) menuNtpuItem.onclick = (e) => {
     e.stopPropagation();
     _ntpuSearchEnabled = !_ntpuSearchEnabled;
     if (_ntpuSearchEnabled) _searchEnabled = false; // 互斥
@@ -2128,11 +2122,11 @@
 
   function _updateSearchUI() {
     const item = document.getElementById("menuSearchItem");
-    item.classList.toggle("active", _searchEnabled && !_searchQuotaExceeded);
-    item.classList.toggle("disabled", _searchQuotaExceeded);
+    item?.classList.toggle("active", _searchEnabled && !_searchQuotaExceeded);
+    item?.classList.toggle("disabled", _searchQuotaExceeded);
 
     const ntpuItem = document.getElementById("menuNtpuItem");
-    ntpuItem.classList.toggle("ntpu-active", _ntpuSearchEnabled);
+    ntpuItem?.classList.toggle("ntpu-active", _ntpuSearchEnabled);
 
     attachBtn.classList.toggle("search-on", _searchEnabled && !_searchQuotaExceeded);
     attachBtn.classList.toggle("ntpu-on", _ntpuSearchEnabled);
@@ -3371,15 +3365,15 @@
         title: "From your question to a useful answer",
         intro: "NTPU AI handles model choice and tools for you. You can simply describe what you need.",
         steps: [
-          ["ask","Ask naturally","Type a question, attach a file, or turn on web or NTPU search."],
+          ["ask","Ask naturally","Type a question or attach a file when you need the AI to read it."],
           ["route","Understand the task","The system estimates difficulty and selects an appropriate model tier."],
-          ["tools","Use tools when needed","Search and file-reading tools are only used when the request needs them."],
+          ["tools","Use tools when needed","File-reading tools are only used when the request needs them."],
           ["answer","Stream the answer","The answer appears as it is generated, so you do not wait for the whole response."],
         ],
         details: [
-          ["Guest or signed in","Guests can chat, upload and search without creating an account. Signed-in users can save chats and memory."],
+          ["Guest or signed in","Guests can chat and upload without creating an account. Signed-in users can save chats and memory."],
           ["Privacy boundary","Guest chat content is not saved. Usage statistics do not include question or answer text."],
-          ["A meaningful session","A chat counts as a valid session after 3 completed questions; a one-tap satisfaction survey then appears."],
+          ["Session statistics","Every chat session is counted. A one-tap satisfaction survey appears after 3 completed questions."],
         ],
         note: "AI can still make mistakes. Verify important academic, administrative, medical, legal or financial information.",
       } : {
@@ -3395,7 +3389,7 @@
         details: [
           ["Identity","Signed-in requests use Worker HMAC tokens. Guest statistics use a SHA-256 pseudonym plus an AES-GCM encrypted recovery ID."],
           ["Storage","Cloudflare D1 stores signed-in sessions, usage and CSAT. R2 stores isolated attachments. Guest conversation text is not persisted."],
-          ["Metrics","Each completed request creates one usage event. Three events under one session ID form a valid session; CSAT uses ratings 4–5."],
+          ["Metrics","Every session ID is counted from its first completed request. At 3 requests it becomes eligible for the survey; CSAT uses ratings 4–5."],
         ],
         note: "System prompts, user memory and retrieved context are assembled server-side before the selected model is called; secrets never enter frontend code.",
       };
@@ -3404,15 +3398,15 @@
       title: "從你的問題，到一個有用的回答",
       intro: "模型選擇與工具判斷都由 NTPU AI 處理，你只要直接說明需要什麼。",
       steps: [
-        ["ask","自然提問","輸入問題、附加檔案，或視需要開啟網路搜尋與校內搜尋。"],
+        ["ask","自然提問","輸入問題，或在需要 AI 閱讀資料時附加檔案。"],
         ["route","理解需求","系統判斷問題難度，自動選擇適合的小／中／大模型級距。"],
-        ["tools","需要時使用工具","只有問題需要時，才會使用搜尋或檔案閱讀工具補充資料。"],
+        ["tools","需要時使用工具","只有問題需要時，才會使用檔案閱讀工具補充資料。"],
         ["answer","即時產生回答","內容會一邊生成一邊顯示，不必等完整答案全部完成。"],
       ],
       details: [
-        ["訪客或登入都能用","訪客不必建立帳號，也能聊天、上傳與搜尋；登入後則能保存對話與長期記憶。"],
+        ["訪客或登入都能用","訪客不必建立帳號，也能聊天與上傳檔案；登入後則能保存對話與長期記憶。"],
         ["清楚的隱私邊界","訪客對話內容不保存；使用統計也不會記錄問題或回答文字。"],
-        ["有意義的 Session","同一對話完成 3 個問題才算有效 Session，之後會出現一次一鍵滿意度調查。"],
+        ["Session 統計","每個對話 Session 都會計入統計；完成 3 個問題後，才會出現一次一鍵滿意度調查。"],
       ],
       note: "AI 仍可能出錯；重要的學業、行政、醫療、法律或財務資訊，請再向可靠來源確認。",
     } : {
@@ -3428,7 +3422,7 @@
       details: [
         ["身分識別","登入者使用 Worker HMAC 權杖；訪客統計使用 SHA-256 假名 ID，另以 AES-GCM 加密保存可還原 ID。"],
         ["資料儲存","Cloudflare D1 保存登入者 Session、用量與 CSAT；R2 隔離保存附件；訪客對話文字不落地。"],
-        ["統計定義","每個成功請求形成一筆用量事件；相同 Session ID 累積 3 筆才是有效 Session，CSAT 以 4–5 分計算。"],
+        ["統計定義","每個 Session ID 從第 1 個完成請求起就會計數；累積 3 題後才符合問卷資格，CSAT 以 4–5 分計算。"],
       ],
       note: "System Prompt、使用者記憶與檢索內容會在伺服器端組合後才呼叫模型；Secret 不會進入前端程式。",
     };

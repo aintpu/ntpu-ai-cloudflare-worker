@@ -68,14 +68,22 @@ test("原 Cloud Run 網址與 Firebase SDK 已移除", async () => {
 
 test("管理統計維持原版 users/by_model/satisfaction/feedback 格式", async () => {
   const usage = [1,2,3].map(i => ({ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",access_type:"guest",model:"cloud-small-claude",route:"small",input_tokens:10,output_tokens:5,created_at:`2026-08-11T00:00:0${i}Z` }));
+  usage.push({ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s2",access_type:"guest",model:"cloud-small-claude",route:"small",input_tokens:10,output_tokens:5,created_at:"2026-08-11T00:00:04Z" });
   const feedback = [{ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",rating:5,is_guest:1,question_count:3,created_at:"2026-08-11T00:01:00Z" }];
   const fakeEnv = { DB: { prepare: sql => ({ bind: () => ({ sql }) }), batch: async () => [{ results: usage }, { results: feedback }] } };
   const data = await adminStats(fakeEnv, new URL("https://example.com/admin/stats"));
-  assert.equal(data.users[0].total, 3);
-  assert.equal(data.users[0].conversations, 1);
-  assert.equal(data.by_model[0].input_tokens, 30);
+  assert.equal(data.users[0].total, 4);
+  assert.equal(data.users[0].conversations, 2);
+  assert.equal(data.by_model[0].input_tokens, 40);
   assert.deepEqual(data.satisfaction, { responses:1, average:5, csat_percent:100, response_rate:100, distribution:{"1":0,"2":0,"3":0,"4":0,"5":1} });
   assert.equal(data.feedback[0].question_count, 3);
+});
+
+test("搜尋按鈕不出現在附件選單，三題後才顯示滿意度問卷", async () => {
+  const html = await readFile("public/index.html", "utf8");
+  assert.doesNotMatch(html, /id="menuSearchItem"/);
+  assert.doesNotMatch(html, /id="menuNtpuItem"/);
+  assert.match(html, /sessionQuestionCount < 3/);
 });
 
 test("Cloudflare 可直接擷取 DOCX 文字供預覽與模型使用", () => {

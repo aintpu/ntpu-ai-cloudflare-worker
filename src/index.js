@@ -106,13 +106,17 @@ export async function adminStats(env, url) {
       addModel(row.model, row.answer_input_tokens, row.answer_output_tokens);
     } else addModel(row.model, row.input_tokens, row.output_tokens);
   }
-  for (const [key, count] of sessionMap) if (count >= 3) userMap.get(key.split("\u0000")[0]).conversations++;
+  let eligibleSurveySessions = 0;
+  for (const [key, count] of sessionMap) {
+    userMap.get(key.split("\u0000")[0]).conversations++;
+    if (count >= 3) eligibleSurveySessions++;
+  }
   const users = [...userMap.values()].sort((a,b) => b.total-a.total);
   const by_model = [...modelMap.values()].sort((a,b) => (b.input_tokens+b.output_tokens)-(a.input_tokens+a.output_tokens));
   const distribution = { "1":0,"2":0,"3":0,"4":0,"5":0 }; let sum=0, positive=0;
   const feedback = (feedbackResult.results || []).filter(x => x.rating>=1 && x.rating<=5).map(x => { distribution[String(x.rating)]++; sum+=x.rating; if(x.rating>=4)positive++; return { uid:x.stats_uid,email:x.email||"",is_guest:!!x.is_guest,session_id:x.session_id,rating:x.rating,question_count:x.question_count||0,timestamp:x.created_at }; });
-  const responses=feedback.length, validSessions=users.reduce((n,u)=>n+u.conversations,0);
-  return { users, by_model, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: validSessions ? Math.min(100,Math.round(responses*1000/validSessions)/10) : 0, distribution }, feedback };
+  const responses=feedback.length;
+  return { users, by_model, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
 }
 
 async function admin(req, env, url) {
