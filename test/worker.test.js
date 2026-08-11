@@ -4,11 +4,11 @@ import test from "node:test";
 import worker, { adminStats } from "../src/index.js";
 import { extractOfficeText } from "../src/office.js";
 import { routeFromScore } from "../src/routing.js";
+import { MODEL_PROVIDER_IDS } from "../src/models.js";
 import { aesDecrypt, aesEncrypt } from "../src/utils.js";
 import { strToU8, zipSync } from "fflate";
 
 const env = {
-  OPENAI_MODEL: "gpt-5.6-luna",
   ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) },
 };
 
@@ -19,12 +19,13 @@ test("health 明確標示純 Cloudflare、未使用 GCP", async () => {
   assert.equal(response.headers.get("x-ntpu-edge"), "cloudflare-native");
 });
 
-test("models 只公開單一預設模型", async () => {
+test("模型候選與原版 aintpu/aintpu 相同", async () => {
   const response = await worker.fetch(new Request("https://example.com/models"), env);
   const body = await response.json();
-  assert.deepEqual(body.candidates.default, ["gpt-5.6-luna"]);
-  assert.equal(body.notes["gpt-5.6-luna"], "OpenAI GPT-5.6 Luna");
-  assert.equal(body.judge_model, "gpt-5.6-luna");
+  assert.deepEqual(body.candidates.small, ["cloud-small-claude","cloud-small-gemini"]);
+  assert.deepEqual(body.candidates.medium, ["cloud-medium-claude","cloud-medium-gemini"]);
+  assert.deepEqual(body.candidates.large, ["cloud-large-claude","cloud-large-gemini"]);
+  assert.equal(body.judge_model, "judge-model");
 });
 
 test("Judge 沿用原版 small / medium / large 難度門檻", () => {
@@ -34,9 +35,17 @@ test("Judge 沿用原版 small / medium / large 難度門檻", () => {
   assert.equal(routeFromScore(config, 7), "large");
 });
 
+test("OpenRouter provider model ID 與原版 LiteLLM 設定一致", () => {
+  assert.equal(MODEL_PROVIDER_IDS["judge-model"], "mistralai/mistral-small-2603");
+  assert.equal(MODEL_PROVIDER_IDS["memory-model"], "google/gemini-2.5-flash");
+  assert.equal(MODEL_PROVIDER_IDS["cloud-small-claude"], "anthropic/claude-haiku-4.5");
+  assert.equal(MODEL_PROVIDER_IDS["cloud-large-gemini"], "google/gemini-2.5-pro");
+});
+
 test("回答標籤顯示實際模型名稱，不以 NTPU AI 取代", async () => {
   const html = await readFile("public/index.html", "utf8");
-  assert.match(html, /short: "GPT-5\.6 Luna"/);
+  assert.match(html, /short: "Haiku"/);
+  assert.match(html, /short: "Gemini Flash-Lite"/);
   assert.doesNotMatch(html, /"gpt-5\.6-luna": \{ cls: "default", short: "NTPU AI"/);
 });
 
@@ -58,7 +67,7 @@ test("原 Cloud Run 網址與 Firebase SDK 已移除", async () => {
 });
 
 test("管理統計維持原版 users/by_model/satisfaction/feedback 格式", async () => {
-  const usage = [1,2,3].map(i => ({ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",access_type:"guest",model:"gpt-5.6-luna",route:"default",input_tokens:10,output_tokens:5,created_at:`2026-08-11T00:00:0${i}Z` }));
+  const usage = [1,2,3].map(i => ({ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",access_type:"guest",model:"cloud-small-claude",route:"small",input_tokens:10,output_tokens:5,created_at:`2026-08-11T00:00:0${i}Z` }));
   const feedback = [{ stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",rating:5,is_guest:1,question_count:3,created_at:"2026-08-11T00:01:00Z" }];
   const fakeEnv = { DB: { prepare: sql => ({ bind: () => ({ sql }) }), batch: async () => [{ results: usage }, { results: feedback }] } };
   const data = await adminStats(fakeEnv, new URL("https://example.com/admin/stats"));

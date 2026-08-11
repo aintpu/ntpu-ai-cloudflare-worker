@@ -1,9 +1,9 @@
 import { authenticate, requestMagicLink, requireAdmin, verifyMagicLink } from "./auth.js";
 import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
+import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE } from "./models.js";
 import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders, sha256 } from "./utils.js";
 
-const MODEL = "gpt-5.6-luna";
 const owner = async (req, env) => authenticate(req, env);
 const pathMatch = (path, re) => path.match(re);
 
@@ -79,7 +79,7 @@ async function preview(req, env, url) {
 async function transcribe(req, env) {
   const user = await owner(req, env); const limited = await enforceRateLimit(env, `upload:${user.uid}`, 10); if (limited) return limited;
   const form = await req.formData(); const file = form.get("file"); if (!(file instanceof File)) return error("缺少音檔", 400); if (file.size > 25 * 1024 * 1024) return error("音檔過大（上限 25 MB）", 413);
-  const out = new FormData(); out.append("file", file, file.name || "audio.webm"); out.append("model", "gpt-4o-mini-transcribe"); out.append("language", String(form.get("lang") || "zh").startsWith("zh") ? "zh" : "en");
+  const out = new FormData(); out.append("file", file, file.name || "audio.webm"); out.append("model", "whisper-1"); out.append("language", String(form.get("lang") || "zh").startsWith("zh") ? "zh" : "en");
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out }); if (!response.ok) return error("語音轉文字失敗", 502); return new Response(response.body, { headers: { "content-type": "application/json" } });
 }
 
@@ -118,7 +118,7 @@ export async function adminStats(env, url) {
 async function admin(req, env, url) {
   const user = await requireAdmin(req, env); const p = url.pathname;
   if (p === "/admin/setup") return json({ ok: true });
-  if (p === "/admin/config") { if (req.method === "GET") { const row = await env.DB.prepare("SELECT value_json FROM app_config WHERE key='routing'").first(); return json(safeJson(row?.value_json || "{}", {})); } const body = await req.json(); await env.DB.prepare("INSERT INTO app_config VALUES('routing',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at").bind(JSON.stringify(body), nowIso()).run(); return json({ ok: true }); }
+  if (p === "/admin/config") { if (req.method === "GET") { const row = await env.DB.prepare("SELECT value_json FROM app_config WHERE key='routing'").first(); return json({threshold_tiny:null,threshold_medium:4,threshold_large:7,force_model:null,prefer_local:false,...safeJson(row?.value_json || "{}", {})}); } const body = await req.json(); const force=body.force_model; if(force && !["small","medium","large","tiny"].includes(force) && !MODEL_TO_ROUTE[force])return error(`模型 ${force} 尚未在目前環境註冊`,400); await env.DB.prepare("INSERT INTO app_config VALUES('routing',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at").bind(JSON.stringify(body), nowIso()).run(); return json({ ok: true }); }
   if (p === "/admin/stats") return json(await adminStats(env, url));
   const reveal = pathMatch(p, /^\/admin\/guest-id\/(guest:[a-z0-9_-]{16})$/i); if (reveal) { const row = await env.DB.prepare("SELECT guest_id_encrypted FROM usage_logs WHERE stats_uid=? AND guest_id_encrypted<>'' ORDER BY id DESC LIMIT 1").bind(reveal[1]).first(); if (!row) return error("找不到識別碼",404); return json({ stats_uid: reveal[1], guest_id: await aesDecrypt(row.guest_id_encrypted, env.GUEST_ID_ENCRYPTION_KEY, reveal[1]) }); }
   if (p === "/admin/users" && req.method === "GET") { const rows = await env.DB.prepare("SELECT uid,email,is_admin,created_at,last_login_at FROM users ORDER BY created_at DESC").all(); return json(rows.results || []); }
@@ -130,7 +130,7 @@ async function admin(req, env, url) {
 async function api(req, env) {
   const url = new URL(req.url), p = url.pathname;
   if (p === "/health") return json({ status: "ok", runtime: "cloudflare-native", gcp: false });
-  if (p === "/models") { const model = env.OPENAI_MODEL || MODEL; return json({ candidates: { default: [model], small: [model], medium: [model], large: [model] }, judge_model: env.OPENAI_JUDGE_MODEL || model, notes: { [model]: "OpenAI GPT-5.6 Luna" }, disabled: [] }); }
+  if (p === "/models") return json({ candidates:MODEL_CANDIDATES, judge_model:JUDGE_ALIAS, notes:MODEL_NOTES, disabled:[] });
   if (p === "/auth/request-link" && req.method === "POST") {
     const limited = await enforceRateLimit(env, `login:${clientIp(req)}`, 5, 600);
     return limited || requestMagicLink(req, env);

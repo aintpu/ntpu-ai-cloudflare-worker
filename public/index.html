@@ -1025,31 +1025,10 @@
             <option value="large">大模型候選池（由 judge 選）</option>
             <option value="cloud-small-claude">Haiku（小模型）</option>
             <option value="cloud-small-gemini">Gemini Flash-Lite（小模型）</option>
-            <option value="cloud-small-gpt">GPT-4o mini（小模型）</option>
-            <option value="cloud-small-gpt-oss20">gpt-oss-20b 免費（小模型）</option>
-            <option value="cloud-small-gemma-free">Gemma 4 26B 免費（小模型）</option>
-            <option value="cloud-small-nemotron-nano9">Nemotron Nano 9B 免費（小模型）</option>
-            <option value="cloud-small-nemotron-nano12vl">Nemotron Nano 12B VL 免費（小模型）</option>
             <option value="cloud-medium-claude">Sonnet（中模型）</option>
             <option value="cloud-medium-gemini">Gemini Flash（中模型）</option>
-            <option value="cloud-medium-gemma">Gemma 4 31B（中模型）</option>
-            <option value="cloud-medium-llama">Llama 3.3 70B（中模型）</option>
-            <option value="cloud-medium-nemotron">Nemotron Super 49B（中模型）</option>
-            <option value="cloud-medium-grok-build">Grok Build 0.1（中模型）</option>
-            <option value="cloud-medium-grok43">Grok 4.3（中模型）</option>
-            <option value="cloud-medium-gpt-oss120">gpt-oss-120b（中模型）</option>
-            <option value="cloud-medium-gemma-free">Gemma 4 31B 免費（中模型）</option>
-            <option value="cloud-medium-nemotron-nano30">Nemotron 3 Nano 30B 免費（中模型）</option>
-            <option value="cloud-medium-nemotron-omni">Nemotron 3 Nano Omni 免費（中模型）</option>
             <option value="cloud-large-claude">Opus（大模型）</option>
             <option value="cloud-large-gemini">Gemini Pro（大模型）</option>
-            <option value="cloud-large-grok420">Grok 4.20（大模型）</option>
-            <option value="cloud-large-grok420-agent">Grok 4.20 Multi-Agent（大模型）</option>
-            <option value="cloud-large-nemotron-super120">Nemotron 3 Super 120B 免費（大模型）</option>
-            <option value="cloud-large-nemotron-ultra550">Nemotron 3 Ultra 550B 免費（大模型）</option>
-            <option value="local-large-gemma4">Gemma 4（地端・大模型）</option>
-            <option value="local-large-gpt-oss">GPT-OSS（地端・大模型）</option>
-            <option value="tiny">強制開源小模型</option>
           </select>
         </div>
         <button class="save-btn" onclick="saveConfig()">儲存設定</button>
@@ -1779,7 +1758,14 @@
   }
 
   const MODEL_META = {
-    "gpt-5.6-luna": { cls: "small", short: "GPT-5.6 Luna", full: "OpenAI GPT-5.6 Luna" },
+    "cloud-small-claude":  { cls: "small",  short: "Haiku",             full: "Claude Haiku 4.5" },
+    "cloud-small-gemini":  { cls: "small",  short: "Gemini Flash-Lite", full: "Gemini 3.1 Flash-Lite" },
+    "cloud-medium-claude": { cls: "medium", short: "Sonnet",            full: "Claude Sonnet 5" },
+    "cloud-medium-gemini": { cls: "medium", short: "Gemini Flash",      full: "Gemini 3.5 Flash" },
+    "cloud-large-claude":  { cls: "large",  short: "Opus",              full: "Claude Opus 4.8" },
+    "cloud-large-gemini":  { cls: "large",  short: "Gemini Pro",        full: "Gemini 2.5 Pro" },
+    "judge-model":         { cls: "small",  short: "Judge",             full: "Mistral Small 4" },
+    "memory-model":        { cls: "small",  short: "Memory",            full: "Gemini 2.5 Flash" },
   };
 
   // 從後端 /models 補齊模型清單（唯一來源在 config.py），
@@ -3402,8 +3388,8 @@
         steps: [
           ["ask","Client","Cloudflare-signed token or a random guest ID, session ID, message and optional tool flags."],
           ["shield","Worker boundary","Validation, NTPU account policy and guest attachment isolation run at the edge."],
-          ["brain","Worker orchestration","The Worker assembles context and enables search only when requested."],
-          ["server","OpenAI API","The Worker calls one configured default model directly without a gateway."],
+          ["brain","Judge and routing","Mistral Small 4 scores the task and selects the original small, medium or large model pool."],
+          ["server","OpenRouter models","The Worker calls the selected Claude or Gemini model through OpenRouter."],
           ["answer","SSE response","Tokens stream to the browser; usage and eligible signed-in history are persisted afterward."],
         ],
         details: [
@@ -3435,8 +3421,8 @@
       steps: [
         ["ask","Client","送出 Worker 簽發權杖或隨機訪客 ID、Session ID、訊息與工具開關。"],
         ["shield","Worker 邊界","在 Cloudflare Edge 執行驗證、NTPU 帳號政策與訪客附件隔離。"],
-        ["brain","Worker 編排","Worker 組合對話脈絡，並只在使用者開啟時啟用搜尋。"],
-        ["server","OpenAI API","Worker 直接呼叫單一預設模型，不經模型閘道。"],
+        ["brain","Judge 與路由","Mistral Small 4 依原版規則評分，選擇 small／medium／large 候選池。"],
+        ["server","OpenRouter 模型","Worker 透過 OpenRouter 呼叫 Judge 選定的 Claude 或 Gemini 模型。"],
         ["answer","SSE 串流","Token 串流回瀏覽器，之後背景寫入用量及符合條件的登入者對話。"],
       ],
       details: [
