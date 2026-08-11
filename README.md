@@ -1,76 +1,62 @@
-# NTPU AI — Cloudflare Worker 版
+# NTPU AI — Cloudflare 原生版
 
-這是與 GCP 主專案完全分離的 Cloudflare Worker 專案：
-
-- Cloudflare Static Assets 提供 `public/index.html`。
-- Worker 將允許清單內的 API 路徑反向代理至既有 GCP Cloud Run Router。
-- FastAPI、Firebase、Firestore、GCS、LiteLLM 與模型仍留在 GCP，不搬進 Worker。
-- 瀏覽器只呼叫同源 Worker，因此不需要為 API 放寬跨網域 CORS。
+這是與原 GCP 專案完全分離的版本。網站執行環境、API、資料與附件皆在 Cloudflare，只有模型推論及語音辨識直接呼叫 OpenAI API。
 
 ```text
-瀏覽器
-  ├─ /、靜態內容 ──> Cloudflare Static Assets
-  └─ /models、/chat/*、/admin/* ...
-                      └─> Cloudflare Worker
-                            └─> GCP Cloud Run Router
-                                  └─> LiteLLM / 模型、Firestore、GCS
+瀏覽器 → Cloudflare Worker
+          ├─ Static Assets：前端
+          ├─ D1：帳號、對話、統計、回饋、分享
+          ├─ R2：使用者附件
+          ├─ Email Service：Magic Link 登入信
+          └─ OpenAI API：回答、Web Search、語音辨識
 ```
 
-## 本機使用
+本專案不含 Cloud Run、Firebase、Firestore、GCS、LiteLLM 或 OpenRouter。
 
-需要 Node.js 20 以上：
+## Cloudflare 資源
+
+- Worker：`ntpu-ai-cloudflare-worker`
+- D1：`ntpu-ai-worker-db`
+- R2：`ntpu-ai-worker-uploads`
+- 網址：<https://ntpu-ai-cloudflare-worker.aintpu.workers.dev>
+
+## 本機檢查與部署
 
 ```powershell
 npm install
-npm test
-npm run deploy:check
-npm run dev
-```
-
-## 部署
-
-第一次使用先登入：
-
-```powershell
-npx wrangler login
+npm run check
+npx wrangler d1 migrations apply ntpu-ai-worker-db --remote
 npm run deploy
 ```
 
-預設 Worker 名稱是 `ntpu-ai-cloudflare-worker`，測試網址會是：
+## 必要 Secrets
 
-```text
-https://ntpu-ai-cloudflare-worker.<Cloudflare 帳號子網域>.workers.dev
+以下值只透過 `wrangler secret put` 設定，不得寫入 Git：
+
+```powershell
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put AUTH_SECRET
+npx wrangler secret put GUEST_ID_ENCRYPTION_KEY
 ```
 
-部署後至少確認：
+## Email Magic Link
 
-```text
-GET /health  -> 200, {"status":"ok"}
-GET /models  -> 200
-POST /chat/stream -> SSE 串流
-```
+登入不使用 Firebase。需先在 Cloudflare Email Service onboard `ntpu.ai`，完成 SPF、DKIM 等 DNS 驗證，再於 `wrangler.jsonc` 加入 `EMAIL` send binding。寄件者預設為 `NTPU AI <noreply@ntpu.ai>`，登入連結單次有效 15 分鐘。
 
-## Firebase Email Link
+允許申請帳號的網域：
 
-若要在 `workers.dev` 網址測試登入，必須到 Firebase Console → Authentication →
-Settings → Authorized domains，加入完整 hostname，例如：
+- `gm.ntpu.edu.tw`
+- `ms.ntpu.edu.tw`
+- `mail.ntpu.edu.tw`
+- 固定管理員：`aintpu@gmail.com`
 
-```text
-ntpu-ai-cloudflare-worker.aintpu.workers.dev
-```
+## 資料政策
 
-只測試訪客聊天時不需要這一步。
+- 登入者對話儲存在 D1。
+- 訪客對話文字只留在瀏覽器，不寫入 D1。
+- 訪客統計使用假名 ID；原始訪客 ID 以 AES-GCM 加密後保存，可由管理員按需還原。
+- 附件按登入 UID 或訪客 ID 分隔存放於 R2，預覽 API 會檢查所有權。
 
-## 正式網域注意事項
+## 正式網域
 
-在 Worker 版完整驗證前，不要把 `ai.ntpu.ai` 從現有 Cloud Run 切走。確認登入、聊天、
-附件、搜尋、管理員與串流全部正常後，再規劃 Cloudflare Route 或自訂網域切換。
-
-## 安全設計
-
-- 只代理明確列出的 API 路徑，不能把 Worker 當任意 URL proxy。
-- `BACKEND_ORIGIN` 必須是 HTTPS。
-- 不主動轉送 `CF-Connecting-IP`、`CF-IPCountry`、`CF-Ray` 等訪客網路識別標頭。
-- 保留 Authorization 與串流 body，Firebase Token、上傳與 SSE 可正常穿透。
-- 靜態頁面由 Worker 加上 CSP、HSTS、X-Frame-Options 等安全回應標頭。
-- Secret 不得放入 Git、`wrangler.jsonc` 或前端；需要時使用 `wrangler secret put`。
+此版本尚未接管 `ai.ntpu.ai`；原 GCP 正式站不受影響。所有登入、附件、搜尋與管理功能驗證完成後，再決定是否切換自訂網域。

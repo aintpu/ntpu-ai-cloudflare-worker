@@ -1,85 +1,40 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-import { handleRequest, isApiPath } from "../src/index.js";
+import worker from "../src/index.js";
+import { aesDecrypt, aesEncrypt } from "../src/utils.js";
 
 const env = {
-  BACKEND_ORIGIN: "https://backend.example.test",
-  ASSETS: {
-    async fetch() {
-      return new Response("<h1>NTPU AI</h1>", {
-        headers: { "Content-Type": "text/html" },
-      });
-    },
-  },
+  OPENAI_MODEL: "gpt-5.6-luna",
+  ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) },
 };
 
-test("辨識所有主要 API 路徑，不把一般靜態路徑送往後端", () => {
-  for (const path of [
-    "/health", "/models", "/chat/stream", "/feedback/session", "/conversations",
-    "/conversations/s-1", "/share/abc", "/user/profile", "/admin/stats",
-    "/upload", "/file-preview?path=x", "/transcribe",
-  ]) {
-    assert.equal(isApiPath(new URL(path, "https://worker.test").pathname), true, path);
-  }
-  assert.equal(isApiPath("/"), false);
-  assert.equal(isApiPath("/assets/app.js"), false);
-  assert.equal(isApiPath("/administrator"), false);
-});
-
-test("API 請求代理到固定 HTTPS 後端並保留路徑、查詢與授權", async () => {
-  let received;
-  const response = await handleRequest(
-    new Request("https://worker.test/models?lang=zh", {
-      headers: { Authorization: "Bearer test-token", "CF-Connecting-IP": "192.0.2.1" },
-    }),
-    env,
-    async (request) => {
-      received = request;
-      return Response.json({ ok: true });
-    },
-  );
-  assert.equal(received.url, "https://backend.example.test/models?lang=zh");
-  assert.equal(received.headers.get("Authorization"), "Bearer test-token");
-  assert.equal(received.headers.get("CF-Connecting-IP"), null);
-  assert.equal(received.headers.get("X-Forwarded-Host"), "worker.test");
+test("health 明確標示純 Cloudflare、未使用 GCP", async () => {
+  const response = await worker.fetch(new Request("https://example.com/health"), env);
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("X-NTPU-Edge"), "cloudflare-worker");
+  assert.deepEqual(await response.json(), { status: "ok", runtime: "cloudflare-native", gcp: false });
+  assert.equal(response.headers.get("x-ntpu-edge"), "cloudflare-native");
 });
 
-test("POST body 與串流回應可穿透代理", async () => {
-  const response = await handleRequest(
-    new Request("https://worker.test/chat/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "hello" }),
-    }),
-    env,
-    async (request) => {
-      assert.deepEqual(await request.json(), { message: "hello" });
-      return new Response("data: [DONE]\n\n", { headers: { "Content-Type": "text/event-stream" } });
-    },
-  );
-  assert.equal(response.headers.get("Content-Type"), "text/event-stream");
-  assert.equal(await response.text(), "data: [DONE]\n\n");
+test("models 只公開單一預設模型", async () => {
+  const response = await worker.fetch(new Request("https://example.com/models"), env);
+  const body = await response.json();
+  assert.deepEqual(body.candidates.default, ["gpt-5.6-luna"]);
 });
 
-test("前端由 Static Assets 提供並附加安全標頭", async () => {
-  const response = await handleRequest(new Request("https://worker.test/"), env, async () => {
-    throw new Error("不應呼叫外部 fetch");
-  });
+test("一般路徑由 Static Assets 提供", async () => {
+  const response = await worker.fetch(new Request("https://example.com/about"), env);
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /NTPU AI/);
-  assert.equal(response.headers.get("X-Frame-Options"), "DENY");
-  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.match(await response.text(), /doctype html/i);
 });
 
-test("後端連線失敗時回傳不洩漏內部資訊的 502", async () => {
-  const response = await handleRequest(
-    new Request("https://worker.test/models"),
-    env,
-    async () => { throw new Error("secret internal detail"); },
-  );
-  assert.equal(response.status, 502);
-  assert.doesNotMatch(await response.text(), /secret internal detail/);
+test("訪客識別碼可用 AES-GCM 還原", async () => {
+  const encrypted = await aesEncrypt("00112233445566778899aabbccddeeff", "test-secret", "guest:test");
+  assert.equal(await aesDecrypt(encrypted, "test-secret", "guest:test"), "00112233445566778899aabbccddeeff");
+});
+
+test("原 Cloud Run 網址與 Firebase SDK 已移除", async () => {
+  const files = await Promise.all([readFile("src/index.js", "utf8"), readFile("wrangler.jsonc", "utf8"), readFile("public/index.html", "utf8")]);
+  const joined = files.join("\n");
+  assert.doesNotMatch(joined, /run\.app|firebase-app-compat|firebase-auth-compat|BACKEND_ORIGIN/);
 });

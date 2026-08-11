@@ -1266,17 +1266,11 @@
 <!-- Markdown -->
 <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-
 <script>
   // 後端網址自動偵測：頁面由後端自己 serve（正式站 Cloud Run 或本機
   // uvicorn 都是），直接用同源即可，本機測試不用再手動改這裡；
   // 只有直接用 file:// 開啟 index.html 時才退回寫死的正式站網址。
-  const BASE_URL = location.protocol === "file:"
-    ? "https://ntpu-router-158606109353.asia-east1.run.app"
-    : location.origin;
+  const BASE_URL = location.origin;
 
   // ── 共用單色線條圖示（取代 emoji；stroke 用 currentColor，自動跟隨按鈕文字色）──
   const _svg = (inner, size = 16) =>
@@ -1291,21 +1285,27 @@
     trash:   _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>', 13),
   };
 
-  firebase.initializeApp({
-    apiKey: "AIzaSyCxn9hXVKfT-a4qn048Jya8-FJmdwqs-t4",
-    authDomain: "aintpuai-fa4fc.firebaseapp.com",
-    projectId: "aintpuai-fa4fc",
-    storageBucket: "aintpuai-fa4fc.firebasestorage.app",
-    messagingSenderId: "495790502594",
-    appId: "1:495790502594:web:4c5467aea383cb8038c15b",
+  // Cloudflare Worker 原生 Magic Link auth；token 只存於瀏覽器，不再使用 Firebase。
+  const AUTH_TOKEN_KEY = "ntpu_ai_cf_auth_token";
+  const AUTH_USER_KEY = "ntpu_ai_cf_auth_user";
+  const _authListeners = [];
+  const _makeUser = (data, token) => ({
+    uid: data.uid, email: data.email, displayName: "",
+    getIdToken: async () => token,
+    getIdTokenResult: async () => ({ claims: { admin: data.admin === true } }),
   });
-  const auth = firebase.auth();
-  auth.languageCode = "zh-TW";
+  let _authUser = (() => { try { const token=localStorage.getItem(AUTH_TOKEN_KEY), data=JSON.parse(localStorage.getItem(AUTH_USER_KEY)||"null"); return token&&data?_makeUser(data,token):null; } catch { return null; } })();
+  const auth = {
+    languageCode: "zh-TW",
+    sendSignInLinkToEmail: async email => { const r=await fetch(`${BASE_URL}/auth/request-link`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})}); if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.detail||`HTTP ${r.status}`);} },
+    isSignInWithEmailLink: url => new URL(url).searchParams.has("login_token"),
+    signInWithEmailLink: async (_email,url) => { const loginToken=new URL(url).searchParams.get("login_token"); const r=await fetch(`${BASE_URL}/auth/verify`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:loginToken})}); const b=await r.json().catch(()=>({})); if(!r.ok)throw new Error(b.detail||`HTTP ${r.status}`); localStorage.setItem(AUTH_TOKEN_KEY,b.token);localStorage.setItem(AUTH_USER_KEY,JSON.stringify(b.user));_authUser=_makeUser(b.user,b.token);_authListeners.forEach(fn=>fn(_authUser)); },
+    signOut: async () => { localStorage.removeItem(AUTH_TOKEN_KEY);localStorage.removeItem(AUTH_USER_KEY);_authUser=null;_authListeners.forEach(fn=>fn(null)); },
+    onAuthStateChanged: fn => { _authListeners.push(fn); queueMicrotask(()=>fn(_authUser)); },
+  };
 
   // ── Auth UI（Email Link / passwordless）──
-  // 相同 email 會登入 Firebase 內既有的帳號，不會另建一個使用者。
-  // 新帳號的網域限制由後端 /me 判定。前端不能安全地判斷某 Email 是否已存在，
-  // 因此不在寄信前擋網域，才能讓 Firebase 中既有的非學校帳號繼續登入。
+  // 相同 email 會對應到 Cloudflare D1 中相同帳號；網域限制由 Worker 強制執行。
   const EMAIL_FOR_SIGN_IN_KEY = "ntpu_ai_email_for_sign_in";
   const GUEST_ID_KEY = "ntpu_ai_guest_id";
 
@@ -1343,14 +1343,8 @@
 
   async function completeEmailLinkSignIn() {
     if (!auth.isSignInWithEmailLink(location.href)) return;
-    let email = localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY) || "";
-    if (!email) email = (prompt(t("authEmailAgain")) || "").trim().toLowerCase();
-    if (!email || !email.includes("@")) {
-      setAuthMsg(t("authInvalidEmail"));
-      return;
-    }
     try {
-      await auth.signInWithEmailLink(email, location.href);
+      await auth.signInWithEmailLink("", location.href);
       localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
       history.replaceState({}, document.title, `${location.origin}${location.pathname}`);
     } catch (e) {
@@ -1451,7 +1445,7 @@
     if (isGuestMode) return;
     currentUser = user;
     if (user) {
-      // 再向後端驗證一次網域（防止繞過前端檢查直接呼叫 Firebase SDK）
+      // 再向 Worker 驗證權杖與帳號狀態。
       const errEl = document.getElementById("auth-err");
       try {
         const token = await user.getIdToken();
@@ -1784,34 +1778,7 @@
     preview.classList.remove("show");
   }
 
-  const MODEL_META = {
-    "cloud-small-claude":  { cls: "small",  short: "Haiku",             full: "Claude Haiku 4.5" },
-    "cloud-small-gemini":  { cls: "small",  short: "Gemini Flash-Lite", full: "Gemini 3.1 Flash-Lite" },
-    "cloud-small-gpt":     { cls: "small",  short: "GPT-4o mini",       full: "GPT-4o mini (OpenRouter)" },
-    "cloud-small-gpt-oss20": { cls: "small", short: "gpt-oss-20b",      full: "gpt-oss-20b (OpenRouter, free)" },
-    "cloud-small-gemma-free": { cls: "small", short: "Gemma 4 26B",     full: "Gemma 4 26B A4B (OpenRouter, free)" },
-    "cloud-small-nemotron-nano9": { cls: "small", short: "Nemotron Nano 9B", full: "Nemotron Nano 9B (OpenRouter, free)" },
-    "cloud-small-nemotron-nano12vl": { cls: "small", short: "Nemotron Nano 12B VL", full: "Nemotron Nano 12B VL (OpenRouter, free)" },
-    "cloud-medium-claude": { cls: "medium", short: "Sonnet",            full: "Claude Sonnet 5" },
-    "cloud-medium-gemini": { cls: "medium", short: "Gemini Flash",      full: "Gemini 3.5 Flash" },
-    "cloud-medium-gemma":  { cls: "medium", short: "Gemma 4",           full: "Gemma 4 31B (OpenRouter)" },
-    "cloud-medium-llama":  { cls: "medium", short: "Llama 3.3",         full: "Llama 3.3 70B (OpenRouter)" },
-    "cloud-medium-nemotron": { cls: "medium", short: "Nemotron 49B",    full: "Llama 3.3 Nemotron Super 49B (NVIDIA)" },
-    "cloud-medium-grok-build": { cls: "medium", short: "Grok Build",    full: "Grok Build 0.1 (OpenRouter)" },
-    "cloud-medium-grok43": { cls: "medium", short: "Grok 4.3",         full: "Grok 4.3 (OpenRouter)" },
-    "cloud-medium-gpt-oss120": { cls: "medium", short: "gpt-oss-120b",  full: "gpt-oss-120b (OpenRouter)" },
-    "cloud-medium-gemma-free": { cls: "medium", short: "Gemma 4 31B (free)", full: "Gemma 4 31B (OpenRouter, free)" },
-    "cloud-medium-nemotron-nano30": { cls: "medium", short: "Nemotron 3 Nano 30B", full: "Nemotron 3 Nano 30B (OpenRouter, free)" },
-    "cloud-medium-nemotron-omni": { cls: "medium", short: "Nemotron 3 Omni", full: "Nemotron 3 Nano Omni Reasoning (OpenRouter, free)" },
-    "cloud-large-claude":  { cls: "large",  short: "Opus",              full: "Claude Opus 4.8" },
-    "cloud-large-gemini":  { cls: "large",  short: "Gemini Pro",        full: "Gemini 2.5 Pro" },
-    "cloud-large-grok420": { cls: "large",  short: "Grok 4.20",         full: "Grok 4.20 (OpenRouter)" },
-    "cloud-large-grok420-agent": { cls: "large", short: "Grok 4.20 MA", full: "Grok 4.20 Multi-Agent (OpenRouter)" },
-    "cloud-large-nemotron-super120": { cls: "large", short: "Nemotron 3 Super 120B", full: "Nemotron 3 Super 120B (OpenRouter, free)" },
-    "cloud-large-nemotron-ultra550": { cls: "large", short: "Nemotron 3 Ultra 550B", full: "Nemotron 3 Ultra 550B (OpenRouter, free)" },
-    "local-large-gemma4":  { cls: "large",  short: "Gemma 4（地端）",   full: "Gemma 4（地端模型）" },
-    "local-large-gpt-oss": { cls: "large",  short: "GPT-OSS（地端）",   full: "gpt-oss-20b（地端模型）" },
-  };
+  const MODEL_META = { "gpt-5.6-luna": { cls: "default", short: "NTPU AI", full: "NTPU AI 預設模型" } };
 
   // 從後端 /models 補齊模型清單（唯一來源在 config.py），
   // 之後新增模型（例如地端 local-*）時前端不需要改
@@ -3427,15 +3394,15 @@
         title: "Request lifecycle and data boundaries",
         intro: "The browser, router, tools, model gateway and storage layers are separated so each layer has a narrow responsibility.",
         steps: [
-          ["ask","Client","Firebase ID token or a random guest ID, session ID, message and optional tool flags."],
-          ["shield","FastAPI boundary","Schema validation, NTPU account policy, rate limits and guest attachment isolation."],
-          ["brain","Judge + router","A judge scores complexity; routing selects the small, medium or large candidate pool and tools."],
-          ["server","LiteLLM gateway","Stable aliases are resolved through LiteLLM to configured providers such as OpenRouter."],
+          ["ask","Client","Cloudflare-signed token or a random guest ID, session ID, message and optional tool flags."],
+          ["shield","Worker boundary","Validation, NTPU account policy and guest attachment isolation run at the edge."],
+          ["brain","Worker orchestration","The Worker assembles context and enables search only when requested."],
+          ["server","OpenAI API","The Worker calls one configured default model directly without a gateway."],
           ["answer","SSE response","Tokens stream to the browser; usage and eligible signed-in history are persisted afterward."],
         ],
         details: [
-          ["Identity","Signed-in requests use Firebase UID. Guest statistics use a SHA-256 pseudonym plus an AES-GCM encrypted recovery ID."],
-          ["Storage","Firestore stores signed-in sessions, usage and CSAT. GCS stores isolated attachments. Guest conversation text is not persisted."],
+          ["Identity","Signed-in requests use Worker HMAC tokens. Guest statistics use a SHA-256 pseudonym plus an AES-GCM encrypted recovery ID."],
+          ["Storage","Cloudflare D1 stores signed-in sessions, usage and CSAT. R2 stores isolated attachments. Guest conversation text is not persisted."],
           ["Metrics","Each completed request creates one usage event. Three events under one session ID form a valid session; CSAT uses ratings 4–5."],
         ],
         note: "System prompts, user memory and retrieved context are assembled server-side before the selected model is called; secrets never enter frontend code.",
@@ -3460,15 +3427,15 @@
       title: "請求生命週期與資料邊界",
       intro: "瀏覽器、Router、工具、模型閘道與儲存層彼此分離，每一層只負責明確的工作。",
       steps: [
-        ["ask","Client","送出 Firebase ID Token 或隨機訪客 ID、Session ID、訊息與工具開關。"],
-        ["shield","FastAPI 邊界","執行 Schema 驗證、NTPU 帳號政策、速率限制與訪客附件隔離。"],
-        ["brain","Judge + Router","Judge 評估複雜度；Router 選擇小／中／大候選池及是否啟用工具。"],
-        ["server","LiteLLM Gateway","穩定模型別名經 LiteLLM 對應到 OpenRouter 等已設定的供應來源。"],
+        ["ask","Client","送出 Worker 簽發權杖或隨機訪客 ID、Session ID、訊息與工具開關。"],
+        ["shield","Worker 邊界","在 Cloudflare Edge 執行驗證、NTPU 帳號政策與訪客附件隔離。"],
+        ["brain","Worker 編排","Worker 組合對話脈絡，並只在使用者開啟時啟用搜尋。"],
+        ["server","OpenAI API","Worker 直接呼叫單一預設模型，不經模型閘道。"],
         ["answer","SSE 串流","Token 串流回瀏覽器，之後背景寫入用量及符合條件的登入者對話。"],
       ],
       details: [
-        ["身分識別","登入者使用 Firebase UID；訪客統計使用 SHA-256 假名 ID，另以 AES-GCM 加密保存可還原 ID。"],
-        ["資料儲存","Firestore 保存登入者 Session、用量與 CSAT；GCS 隔離保存附件；訪客對話文字不落地。"],
+        ["身分識別","登入者使用 Worker HMAC 權杖；訪客統計使用 SHA-256 假名 ID，另以 AES-GCM 加密保存可還原 ID。"],
+        ["資料儲存","Cloudflare D1 保存登入者 Session、用量與 CSAT；R2 隔離保存附件；訪客對話文字不落地。"],
         ["統計定義","每個成功請求形成一筆用量事件；相同 Session ID 累積 3 筆才是有效 Session，CSAT 以 4–5 分計算。"],
       ],
       note: "System Prompt、使用者記憶與檢索內容會在伺服器端組合後才呼叫模型；Secret 不會進入前端程式。",
