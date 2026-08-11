@@ -56,15 +56,14 @@ export async function requestMagicLink(request, env) {
 export async function verifyMagicLink(request, env) {
   const { token } = await request.json().catch(() => ({}));
   const hash = await sha256(String(token || ""));
-  const row = await env.DB.prepare("SELECT email,expires_at,used_at FROM magic_links WHERE token_hash=?").bind(hash).first();
-  if (!row || row.used_at || Date.parse(row.expires_at) < Date.now()) return error("登入連結無效或已過期", 401);
+  const now = nowIso();
+  const row = await env.DB.prepare("UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>? RETURNING email").bind(now, hash, now).first();
+  if (!row) return error("登入連結無效或已過期", 401);
   const email = row.email.toLowerCase();
   if (!allowedEmail(email, env)) return error("帳號不符合登入資格", 403);
   const uid = uidFromEmail(email);
-  const now = nowIso();
   const admin = email === String(env.ADMIN_EMAIL || "").toLowerCase() ? 1 : 0;
   await env.DB.batch([
-    env.DB.prepare("UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL").bind(now, hash),
     env.DB.prepare("INSERT INTO users(uid,email,is_admin,created_at,last_login_at) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET last_login_at=excluded.last_login_at,is_admin=MAX(users.is_admin,excluded.is_admin)").bind(uid, email, admin, now, now),
     env.DB.prepare("INSERT OR IGNORE INTO profiles(uid) VALUES(?)").bind(uid),
   ]);
