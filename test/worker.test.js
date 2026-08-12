@@ -157,4 +157,8 @@ test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async 
   assert.match(html, /micLoginExpired/);
   assert.match(index, /語音服務金鑰無效/);
   assert.match(index, /語音服務額度不足/);
+  assert.match(index, /gpt-4o-transcribe/);
+  assert.match(index, /使用繁體中文與台灣用語/);
+  assert.match(html, /echoCancellation: true/);
+  assert.match(html, /noiseSuppression: true/);
 });

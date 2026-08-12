@@ -80,7 +80,15 @@ async function transcribe(req, env) {
   const user = await owner(req, env); const limited = await enforceRateLimit(env, `upload:${user.uid}`, 10); if (limited) return limited;
   if (!env.OPENAI_API_KEY) return error("語音服務尚未設定 OPENAI_API_KEY", 503);
   const form = await req.formData(); const file = form.get("file"); if (!(file instanceof File)) return error("缺少音檔", 400); if (file.size > 25 * 1024 * 1024) return error("音檔過大（上限 25 MB）", 413);
-  const out = new FormData(); out.append("file", file, file.name || "audio.webm"); out.append("model", "whisper-1"); out.append("language", String(form.get("lang") || "zh").startsWith("zh") ? "zh" : "en");
+  const chinese = String(form.get("lang") || "zh").startsWith("zh");
+  const out = new FormData();
+  out.append("file", file, file.name || "audio.webm");
+  out.append("model", "gpt-4o-transcribe");
+  out.append("language", chinese ? "zh" : "en");
+  out.append("response_format", "json");
+  out.append("prompt", chinese
+    ? "請忠實逐字轉錄語音，不要回答或改寫內容。使用繁體中文與台灣用語，保留英文、數字和標點。常見詞彙：NTPU、國立臺北大學、臺北大學、通識中心、語言中心、資訊管理學系、OpenRouter、Cloudflare、AI。"
+    : "Transcribe the audio verbatim. Do not answer or rewrite it. Preserve names, English terms, numbers, and punctuation. Common terms: NTPU, National Taipei University, OpenRouter, Cloudflare, AI.");
   let response;
   try {
     response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out });
