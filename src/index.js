@@ -83,7 +83,17 @@ async function transcribe(req, env) {
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out }); if (!response.ok) return error("語音轉文字失敗", 502); return new Response(response.body, { headers: { "content-type": "application/json" } });
 }
 
-export const MESSAGE_FEEDBACK_REASONS = ["wrong", "outdated", "off_topic", "too_vague", "no_source", "other"];
+export const MESSAGE_FEEDBACK_REASONS = [
+  "slow",        // 產生回答等太久
+  "wrong",       // 內容錯誤或憑空捏造
+  "outdated",    // 資訊過時
+  "off_topic",   // 沒回答到問題
+  "too_vague",   // 太籠統、沒有可用內容
+  "too_long",    // 太冗長或一直重複
+  "file",        // 沒有正確讀取附件
+  "language",    // 語言或用字不符（例如出現簡體字）
+  "other",
+];
 
 async function messageFeedback(req, env, url) {
   const user = await authenticate(req, env, false);
@@ -112,13 +122,14 @@ async function messageFeedback(req, env, url) {
     ? [...new Set(body.reasons.filter(x => MESSAGE_FEEDBACK_REASONS.includes(x)))]
     : [];
   const comment = body.vote === "down" ? String(body.comment || "").trim().slice(0, 1000) : "";
+  const elapsedMs = Math.max(0, Math.min(600000, Math.round(Number(body.elapsed_ms) || 0)));
   await env.DB.prepare(`
-    INSERT INTO message_feedback(stats_uid,session_id,answer_index,vote,reasons,comment,is_guest,email,model,route,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO message_feedback(stats_uid,session_id,answer_index,vote,reasons,comment,is_guest,email,model,route,elapsed_ms,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(stats_uid,session_id,answer_index) DO UPDATE SET
       vote=excluded.vote,reasons=excluded.reasons,comment=excluded.comment,
-      model=excluded.model,route=excluded.route,created_at=excluded.created_at
-  `).bind(statsUid, body.session_id, answerIndex, body.vote, JSON.stringify(reasons), comment, user ? 0 : 1, user?.email || "", String(body.model || "").slice(0, 60), String(body.route || "").slice(0, 20), nowIso()).run();
+      model=excluded.model,route=excluded.route,elapsed_ms=excluded.elapsed_ms,created_at=excluded.created_at
+  `).bind(statsUid, body.session_id, answerIndex, body.vote, JSON.stringify(reasons), comment, user ? 0 : 1, user?.email || "", String(body.model || "").slice(0, 60), String(body.route || "").slice(0, 20), elapsedMs, nowIso()).run();
   return json({ ok: true, vote: body.vote });
 }
 
@@ -169,7 +180,7 @@ export async function adminStats(env, url) {
   // ── 每則回答的讚／倒讚 ──
   const reasonCounts = Object.fromEntries(MESSAGE_FEEDBACK_REASONS.map(x => [x, 0]));
   const messageModelMap = new Map();
-  let up = 0, down = 0, withComment = 0;
+  let up = 0, down = 0, withComment = 0, slowReports = 0, slowElapsedSum = 0, slowElapsedCount = 0;
   const messageComments = [];
   for (const row of messageResult?.results || []) {
     const uid = legacyGuestUidMap.get(row.stats_uid) || row.stats_uid;
@@ -182,10 +193,11 @@ export async function adminStats(env, url) {
     for (const reason of reasons) if (reason in reasonCounts) reasonCounts[reason]++;
     if (row.vote === "down") {
       if (row.comment) withComment++;
+      if (reasons.includes("slow")) { slowReports++; if (row.elapsed_ms) { slowElapsedSum += row.elapsed_ms; slowElapsedCount++; } }
       messageComments.push({
         uid, email: row.email || "", is_guest: !!row.is_guest, session_id: row.session_id,
         answer_index: row.answer_index, model: row.model || "", route: row.route || "",
-        reasons, comment: row.comment || "", timestamp: row.created_at,
+        reasons, comment: row.comment || "", elapsed_ms: row.elapsed_ms || 0, timestamp: row.created_at,
       });
     }
   }
@@ -194,6 +206,8 @@ export async function adminStats(env, url) {
     total: messageTotal, up, down,
     positive_percent: messageTotal ? Math.round(up * 1000 / messageTotal) / 10 : 0,
     with_comment: withComment,
+    slow_reports: slowReports,
+    slow_avg_ms: slowElapsedCount ? Math.round(slowElapsedSum / slowElapsedCount) : 0,
     reasons: reasonCounts,
     by_model: [...messageModelMap.values()].sort((a,b) => (b.up+b.down)-(a.up+a.down)),
     comments: messageComments.slice(0, 200),

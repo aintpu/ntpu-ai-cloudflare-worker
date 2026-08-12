@@ -83,7 +83,7 @@ test("管理統計維持原版 users/by_model/satisfaction/feedback 格式", asy
 test("管理統計彙整每則回答的讚／倒讚與原因", async () => {
   const messages = [
     { stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",answer_index:0,vote:"up",reasons:"[]",comment:"",is_guest:1,model:"cloud-small-claude",route:"small",created_at:"2026-08-11T00:02:00Z" },
-    { stats_uid:"u_a",email:"a@gm.ntpu.edu.tw",session_id:"s3",answer_index:1,vote:"down",reasons:'["wrong","outdated"]',comment:"規定已經改了",is_guest:0,model:"cloud-small-claude",route:"small",created_at:"2026-08-11T00:03:00Z" },
+    { stats_uid:"u_a",email:"a@gm.ntpu.edu.tw",session_id:"s3",answer_index:1,vote:"down",reasons:'["slow","wrong","outdated"]',comment:"規定已經改了",is_guest:0,model:"cloud-small-claude",route:"small",elapsed_ms:42000,created_at:"2026-08-11T00:03:00Z" },
   ];
   const fakeEnv = { DB: { prepare: sql => ({ bind: () => ({ sql }) }), batch: async () => [{ results: [] }, { results: [] }, { results: messages }] } };
   const data = await adminStats(fakeEnv, new URL("https://example.com/admin/stats"));
@@ -92,6 +92,8 @@ test("管理統計彙整每則回答的讚／倒讚與原因", async () => {
   assert.equal(data.message_feedback.down, 1);
   assert.equal(data.message_feedback.positive_percent, 50);
   assert.equal(data.message_feedback.reasons.wrong, 1);
+  assert.equal(data.message_feedback.slow_reports, 1);
+  assert.equal(data.message_feedback.slow_avg_ms, 42000);
   assert.equal(data.message_feedback.reasons.outdated, 1);
   assert.equal(data.message_feedback.by_model[0].model, "cloud-small-claude");
   assert.equal(data.message_feedback.comments.length, 1);
