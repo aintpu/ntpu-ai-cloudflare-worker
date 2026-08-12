@@ -199,8 +199,8 @@
     .msg.user .msg-body { max-width: 85%; }
     .welcome { padding: 64px 16px 32px; }
     .welcome h2 { font-size: 22px; }
-    .example-questions { flex-direction: column; margin-top: 22px; gap: 8px; }
-    .example-question { width: 100%; border-radius: 16px; text-align: left; }
+    .example-questions { margin-top: 22px; gap: 8px; }
+    .example-question { width: 100%; }
     .input-area { padding: 8px 10px 12px; }
     textarea { font-size: 16px; }  /* ≥16px 才不會觸發 iOS 聚焦自動放大 */
     #preview-panel { width: 100vw; max-width: 100vw; }
@@ -270,6 +270,7 @@
     transition: background .12s;
   }
   .user-menu-item svg { flex-shrink: 0; color: var(--text3); }
+  .user-menu-item .menu-external { margin-left: auto; color: var(--text5); }
   .user-menu-item:hover { background: var(--sidebar-hover); }
   .user-menu-item.danger { color: var(--danger); }
   .user-menu-item.danger svg { color: var(--danger); }
@@ -284,15 +285,18 @@
   .welcome h2 { font-size: 26px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
   .welcome p { font-size: 14px; }
   .example-questions {
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+    display: flex; flex-direction: column; gap: 10px;
     max-width: 680px; margin: 28px auto 0;
   }
   .example-question {
-    border: 1px solid var(--border3); border-radius: 999px;
-    padding: 10px 18px; background: var(--bg); color: var(--text2);
+    display: flex; flex-direction: column; gap: 4px; text-align: left;
+    border: 1px solid var(--border3); border-radius: 16px;
+    padding: 12px 18px; background: var(--bg); color: var(--text2);
     font: inherit; font-size: 14px; line-height: 1.4; cursor: pointer;
     transition: background .15s, border-color .15s, color .15s;
   }
+  .eq-label { font-size: 12px; font-weight: 600; color: var(--text4); }
+  .example-question:hover .eq-label { color: var(--text2); }
   .example-question:hover {
     background: var(--sidebar-hover); border-color: var(--text4); color: var(--text);
   }
@@ -633,6 +637,42 @@
   .stats-summary-card span { color: var(--text4); font-size: 12px; }
 
   /* 對話滿意度：第三個成功回答後才出現的低干擾 CSAT 卡片 */
+  /* ── 每則回答的讚／倒讚 ── */
+  .msg-actions { display: flex; gap: 4px; margin-top: 2px; }
+  .fb-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px;
+    background: none; color: var(--text5); cursor: pointer; transition: background .12s, color .12s;
+  }
+  .fb-btn:hover { background: var(--sidebar-hover); color: var(--text2); }
+  .fb-btn:disabled { cursor: default; }
+  .fb-btn.active { color: var(--text); background: var(--sidebar-hover); }
+  .fb-btn.active svg { fill: currentColor; fill-opacity: .16; }
+  .fb-done { align-self: center; font-size: 12px; color: var(--text5); margin-left: 4px; }
+  .fb-panel {
+    margin-top: 8px; border: 1px solid var(--border3); border-radius: 14px;
+    padding: 16px 18px; background: var(--bg2); max-width: 560px;
+  }
+  .fb-panel-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .fb-reason { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; font-size: 14px; color: var(--text2); cursor: pointer; }
+  .fb-reason input { width: 16px; height: 16px; margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
+  .fb-panel textarea {
+    width: 100%; margin-top: 12px; min-height: 72px; resize: vertical;
+    border: 1px solid var(--border3); border-radius: 10px; padding: 10px 12px;
+    font: inherit; font-size: 14px; color: var(--text); background: var(--bg);
+  }
+  .fb-panel textarea:focus { outline: none; border-color: var(--text4); }
+  .fb-hint { font-size: 12px; color: var(--text5); margin-top: 8px; }
+  .fb-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  .fb-submit {
+    border: 0; border-radius: 999px; padding: 9px 22px; font: inherit; font-size: 14px; font-weight: 600;
+    background: var(--accent); color: var(--accent-fg); cursor: pointer;
+  }
+  .fb-submit:hover { background: var(--accent-hover); }
+  .fb-submit:disabled { opacity: .55; cursor: wait; }
+  .fb-cancel { border: 0; background: none; color: var(--text4); font: inherit; font-size: 14px; cursor: pointer; }
+  .fb-cancel:hover { color: var(--text2); }
+
   .session-survey { margin: 18px auto 8px; max-width: 520px; border: 1px solid var(--border3); border-radius: 14px; padding: 16px; background: var(--bg2); text-align: center; }
   .session-survey strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 4px; }
   .session-survey p { color: var(--text4); font-size: 12px; margin: 0 0 12px; }
@@ -765,53 +805,6 @@
   .settings-export-btn:hover { filter: brightness(0.95); }
   .settings-msg { font-size: 12px; color: var(--ok); margin-top: 10px; min-height: 18px; }
   .settings-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-
-  /* ── About / How it works ── */
-  #about-overlay {
-    position: fixed; inset: 0; z-index: 165; padding: 20px;
-    background: rgba(0,0,0,.46); display: flex; align-items: center; justify-content: center;
-  }
-  #about-overlay.hidden { display: none; }
-  .about-modal {
-    width: 900px; max-width: 96vw; max-height: 90dvh; overflow: hidden;
-    background: var(--auth-bg); border-radius: 18px; box-shadow: 0 12px 50px rgba(0,0,0,.3);
-    display: flex; flex-direction: column;
-  }
-  .about-header { padding: 16px 20px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 12px; }
-  .about-header h3 { flex: 1; color: var(--text); font-size: 16px; }
-  .about-body { padding: 20px; overflow-y: auto; }
-  .about-tabs { display: inline-flex; padding: 3px; margin-bottom: 18px; border-radius: 10px; background: var(--bg3); }
-  .about-tab { border: 0; border-radius: 8px; padding: 8px 16px; color: var(--text3); background: transparent; cursor: pointer; font-size: 13px; }
-  .about-tab.active { color: var(--text); background: var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.12); font-weight: 600; }
-  .about-intro { margin-bottom: 16px; }
-  .about-intro h4 { color: var(--text); font-size: 19px; margin-bottom: 5px; }
-  .about-intro p { color: var(--text4); font-size: 13px; line-height: 1.6; }
-  .about-flow { display: flex; align-items: stretch; gap: 8px; margin: 16px 0 20px; }
-  .about-card {
-    flex: 1; min-width: 0; border: 1px solid var(--border3); border-radius: 14px;
-    background: var(--bg2); padding: 15px; color: var(--text2);
-  }
-  .about-card-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--accent-fg); background: var(--accent); margin-bottom: 11px; }
-  .about-card-icon svg { width: 19px; height: 19px; }
-  .about-step { color: var(--text5); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
-  .about-card strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 5px; }
-  .about-card p { color: var(--text4); font-size: 12px; line-height: 1.55; }
-  .about-arrow { display: grid; place-items: center; color: var(--text5); font-size: 18px; flex: 0 0 16px; }
-  .about-detail-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
-  .about-detail { border-radius: 12px; padding: 14px; background: var(--table-head-bg); border: 1px solid var(--cfg-border); }
-  .about-detail strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 5px; }
-  .about-detail p { color: var(--text4); font-size: 12px; line-height: 1.55; }
-  .about-note { margin-top: 14px; padding: 11px 13px; border-left: 3px solid var(--accent); background: var(--table-head-bg); border-radius: 7px; color: var(--text3); font-size: 12px; line-height: 1.55; }
-  @media (max-width: 700px) {
-    #about-overlay { padding: 8px; }
-    .about-modal { max-width: 100%; max-height: 94dvh; border-radius: 14px; }
-    .about-body { padding: 15px; }
-    .about-flow { flex-direction: column; }
-    .about-arrow { transform: rotate(90deg); min-height: 15px; }
-    .about-detail-grid { grid-template-columns: 1fr; }
-    .about-tabs { display: flex; }
-    .about-tab { flex: 1; }
-  }
 
   /* ── Attach dropdown menu ── */
   .attach-menu-wrap { position: relative; flex-shrink: 0; }
@@ -1064,7 +1057,8 @@
       </div>
       <div class="user-menu-item" id="aboutBtn" onclick="openAbout()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>
-        <span id="userMenuAboutLabel">運作方式</span>
+        <span id="userMenuAboutLabel">系統介紹</span>
+        <svg class="menu-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
       </div>
       <div class="user-menu-item" id="settingsBtn" onclick="openSettings()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1116,9 +1110,9 @@
         <h2>有什麼我能幫你的？</h2>
         <p>系統會自動判斷問題難度，並在小／中／大級距中選擇合適模型</p>
         <div class="example-questions">
-          <button type="button" class="example-question" data-example-index="0">幫我寫一封向教授請假的 email</button>
-          <button type="button" class="example-question" data-example-index="1">用簡單的方式解釋什麼是機器學習</button>
-          <button type="button" class="example-question" data-example-index="2">幫我規劃一份一週讀書計畫</button>
+          <button type="button" class="example-question" data-example-index="0"><span class="eq-label">AI 對話｜基礎知識</span><span class="eq-text">用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini</span></button>
+          <button type="button" class="example-question" data-example-index="1"><span class="eq-label">學術搜尋｜研究探索</span><span class="eq-text">找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因</span></button>
+          <button type="button" class="example-question" data-example-index="2"><span class="eq-label">分析推理｜專題規劃</span><span class="eq-text">提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目</span></button>
         </div>
       </div>
     </div>
@@ -1190,23 +1184,6 @@
   </div>
 </div>
 
-<!-- ── About / How it works modal ── -->
-<div id="about-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="about-title">
-  <div class="about-modal">
-    <div class="about-header">
-      <h3 id="about-title">About · 運作方式</h3>
-      <button class="settings-close" type="button" onclick="closeAbout()" aria-label="關閉">✕</button>
-    </div>
-    <div class="about-body">
-      <div class="about-tabs" role="tablist">
-        <button class="about-tab active" id="about-tab-general" type="button" onclick="switchAboutView('general')">一般版</button>
-        <button class="about-tab" id="about-tab-technical" type="button" onclick="switchAboutView('technical')">技術版</button>
-      </div>
-      <div id="about-content"></div>
-    </div>
-  </div>
-</div>
-
 <!-- ── Share toast ── -->
 <div id="share-toast">
   <div class="share-toast-title" id="share-toast-title">分享此對話</div>
@@ -1254,6 +1231,8 @@
     mic:     _svg('<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>'),
     link:    _svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', 13),
     trash:   _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>', 13),
+    thumbUp: _svg('<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3z"/><path d="M7 10l4.2-7.2a1 1 0 0 1 1.8.2l.4 1.4a4 4 0 0 1-.2 2.8L12 10h5.6a2 2 0 0 1 2 2.5l-1.6 6a2 2 0 0 1-1.9 1.5H7"/>', 17),
+    thumbDown: _svg('<path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3z"/><path d="M17 14l-4.2 7.2a1 1 0 0 1-1.8-.2l-.4-1.4a4 4 0 0 1 .2-2.8L12 14H6.4a2 2 0 0 1-2-2.5l1.6-6A2 2 0 0 1 7.9 4H17"/>', 17),
   };
 
   // Cloudflare Worker 原生 Magic Link auth；token 只存於瀏覽器，不再使用 Firebase。
@@ -1344,6 +1323,9 @@
   let isAdmin     = false;
   let sessionId   = null;
   let sessionQuestionCount = 0;
+  let sessionAnswerCount = 0;                 // 這個對話已顯示的 AI 回答數，作為回饋的索引
+  let _readOnlyView = false;                  // 分享連結的唯讀檢視，不顯示回饋按鈕
+  const _fbState = new Map();                 // answerIndex -> { vote, reasons, comment }
   let sessionSurveyShown = false;
 
   function guestId() {
@@ -1376,7 +1358,7 @@
     guestHistory = [];
     isAdmin = false;
     sessionId = newSession("guest");
-    sessionQuestionCount = 0;
+    sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear();
     sessionSurveyShown = false;
     document.getElementById("auth-overlay").classList.add("hidden");
     document.getElementById("user-email").textContent = t("guestName");
@@ -1391,7 +1373,7 @@
     isGuestMode = false;
     guestHistory = [];
     sessionId = null;
-    sessionQuestionCount = 0;
+    sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear();
     sessionSurveyShown = false;
     document.getElementById("auth-overlay").classList.remove("hidden");
     document.getElementById("user-email").textContent = "";
@@ -1436,7 +1418,7 @@
       const key = `ai_session_${user.uid}`;
       const savedSid = localStorage.getItem(key);
       sessionId = savedSid || newSession(user.uid);
-      sessionQuestionCount = 0;
+      sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear();
       sessionSurveyShown = false;
 
       // Check admin claim
@@ -1469,7 +1451,7 @@
       document.getElementById("user-email").textContent = "";
       document.getElementById("adminBtn").style.display = "none";
       sessionId = null; isAdmin = false;
-      sessionQuestionCount = 0; sessionSurveyShown = false;
+      sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear(); sessionSurveyShown = false;
       renderConvList([]);
       resetUI();
       clearAttachPreview();
@@ -1571,7 +1553,10 @@
   function welcomeHtml() {
     const questions = t("exampleQuestions");
     const buttons = questions.map((question, index) =>
-      `<button type="button" class="example-question" data-example-index="${index}">${_esc(question)}</button>`
+      `<button type="button" class="example-question" data-example-index="${index}">` +
+        `<span class="eq-label">${_esc(question.label)}</span>` +
+        `<span class="eq-text">${_esc(question.text)}</span>` +
+      `</button>`
     ).join("");
     return `<div class="welcome" id="welcome"><h2>${_esc(t("welcomeH2"))}</h2><p>${_esc(t("welcomeP"))}</p><div class="example-questions">${buttons}</div></div>`;
   }
@@ -1579,6 +1564,8 @@
   function renderLoadedHistory(history) {
     sessionQuestionCount = history.filter(m => m.role === "user").length;
     sessionSurveyShown = false;
+    sessionAnswerCount = 0;
+    _fbState.clear();
     const inner = document.querySelector("#messages .inner");
     inner.innerHTML = "";
     if (!history.length) {
@@ -1599,10 +1586,11 @@
           judge: { score: m._score || 5, reason: m._reason || "" },
           judge_elapsed_ms: 0, answer_elapsed_ms: 0, no_timing: true,
         } : null;
-        appendMsg("ai", m.content, data);
+        appendMsg("ai", m.content, data, null, null, _readOnlyView ? null : sessionAnswerCount++);
       }
     }
     document.querySelector("#messages").scrollTop = 9999;
+    if (!_readOnlyView) loadMessageFeedback(sessionId);
     if (sessionQuestionCount >= 3) setTimeout(maybeShowSessionSurvey, 350);
   }
 
@@ -1611,7 +1599,7 @@
     if (!currentUser && !isGuestMode) return;
     sessionId = newSession(isGuestMode ? "guest" : currentUser.uid);
     if (isGuestMode) guestHistory = [];
-    sessionQuestionCount = 0;
+    sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear();
     sessionSurveyShown = false;
     resetUI();
     sidebar.classList.remove("mobile-open");
@@ -1830,7 +1818,7 @@
     </div>`;
   }
 
-  function appendMsg(role, text, data, fileInfo, quote) {
+  function appendMsg(role, text, data, fileInfo, quote, answerIndex = null) {
     document.getElementById("welcome")?.remove();
     const inner = document.querySelector("#messages .inner");
     const row = document.createElement("div");
@@ -1866,9 +1854,138 @@
         ${fileCardHtml}
         <div class="bubble${isAI ? " md" : ""}">${isAI ? marked.parse(text) : text.replace(/</g, "&lt;")}</div>
         ${metaHtml}
+        ${answerIndex === null ? "" : _feedbackBarHtml(answerIndex, data)}
       </div>`;
     inner.appendChild(row);
     row.scrollIntoView({ block: "end", behavior: "smooth" });
+  }
+
+  // ── 每則回答的讚／倒讚 ──
+  function _feedbackBarHtml(answerIndex, data) {
+    const saved = _fbState.get(answerIndex);
+    const model = data?.model || "";
+    const route = data?.route || "";
+    const up = saved?.vote === "up", down = saved?.vote === "down";
+    return `
+      <div class="msg-actions" data-answer-index="${answerIndex}" data-model="${_esc(model)}" data-route="${_esc(route)}">
+        <button type="button" class="fb-btn fb-up${up ? " active" : ""}" title="${_esc(t("fbHelpful"))}" aria-label="${_esc(t("fbHelpful"))}" aria-pressed="${up}">${ICONS.thumbUp}</button>
+        <button type="button" class="fb-btn fb-down${down ? " active" : ""}" title="${_esc(t("fbNotHelpful"))}" aria-label="${_esc(t("fbNotHelpful"))}" aria-pressed="${down}">${ICONS.thumbDown}</button>
+        ${saved ? `<span class="fb-done">${_esc(t("fbThanks"))}</span>` : ""}
+      </div>`;
+  }
+
+  function _feedbackPanelHtml(answerIndex) {
+    const saved = _fbState.get(answerIndex) || {};
+    const labels = t("fbReasons");
+    const checked = new Set(saved.reasons || []);
+    const rows = Object.keys(labels).map(key => `
+      <label class="fb-reason">
+        <input type="checkbox" value="${key}"${checked.has(key) ? " checked" : ""}>
+        <span>${_esc(labels[key])}</span>
+      </label>`).join("");
+    return `
+      <div class="fb-panel" data-answer-index="${answerIndex}">
+        <div class="fb-panel-title">${_esc(t("fbPanelTitle"))}</div>
+        ${rows}
+        <textarea class="fb-comment" rows="3" maxlength="1000" placeholder="${_esc(t("fbCommentPlaceholder"))}">${_esc(saved.comment || "")}</textarea>
+        <div class="fb-hint">${_esc(t("fbPrivacyHint"))}</div>
+        <div class="fb-actions">
+          <button type="button" class="fb-submit">${_esc(t("fbSubmit"))}</button>
+          <button type="button" class="fb-cancel">${_esc(t("fbCancel"))}</button>
+        </div>
+      </div>`;
+  }
+
+  async function _sendMessageFeedback(payload) {
+    const headers = { "Content-Type": "application/json" };
+    if (isGuestMode) headers["X-Guest-Id"] = guestId();
+    else headers["Authorization"] = `Bearer ${await currentUser.getIdToken()}`;
+    const res = await fetch(`${BASE_URL}/feedback/message`, {
+      method: "POST", headers,
+      body: JSON.stringify({ session_id: sessionId, ...payload }),
+    });
+    if (!res.ok) {
+      let detail = "HTTP " + res.status;
+      try { detail = (await res.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
+  }
+
+  function _markFeedbackDone(bar, vote) {
+    bar.querySelector(".fb-up").classList.toggle("active", vote === "up");
+    bar.querySelector(".fb-up").setAttribute("aria-pressed", String(vote === "up"));
+    bar.querySelector(".fb-down").classList.toggle("active", vote === "down");
+    bar.querySelector(".fb-down").setAttribute("aria-pressed", String(vote === "down"));
+    let done = bar.querySelector(".fb-done");
+    if (!done) { done = document.createElement("span"); done.className = "fb-done"; bar.appendChild(done); }
+    done.textContent = t("fbThanks");
+  }
+
+  async function _handleFeedbackClick(button, bar) {
+    const answerIndex = Number(bar.dataset.answerIndex);
+    const model = bar.dataset.model || "";
+    const route = bar.dataset.route || "";
+    const body = bar.parentElement;
+    body.querySelector(".fb-panel")?.remove();
+
+    if (button.classList.contains("fb-down")) {
+      body.insertAdjacentHTML("beforeend", _feedbackPanelHtml(answerIndex));
+      const panel = body.querySelector(".fb-panel");
+      panel.querySelector(".fb-cancel").onclick = () => panel.remove();
+      panel.querySelector(".fb-submit").onclick = async (e) => {
+        const submit = e.currentTarget;
+        submit.disabled = true;
+        const reasons = [...panel.querySelectorAll("input:checked")].map(x => x.value);
+        const comment = panel.querySelector(".fb-comment").value.trim();
+        try {
+          await _sendMessageFeedback({ answer_index: answerIndex, vote: "down", reasons, comment, model, route });
+          _fbState.set(answerIndex, { vote: "down", reasons, comment });
+          panel.remove();
+          _markFeedbackDone(bar, "down");
+        } catch (err) {
+          submit.disabled = false;
+          alert(t("fbFail") + err.message);
+        }
+      };
+      panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
+
+    // 讚：再按一次可取消
+    const cancel = _fbState.get(answerIndex)?.vote === "up";
+    try {
+      await _sendMessageFeedback({ answer_index: answerIndex, vote: cancel ? null : "up", model, route });
+      if (cancel) {
+        _fbState.delete(answerIndex);
+        bar.querySelector(".fb-up").classList.remove("active");
+        bar.querySelector(".fb-up").setAttribute("aria-pressed", "false");
+        bar.querySelector(".fb-done")?.remove();
+      } else {
+        _fbState.set(answerIndex, { vote: "up", reasons: [], comment: "" });
+        _markFeedbackDone(bar, "up");
+      }
+    } catch (err) {
+      alert(t("fbFail") + err.message);
+    }
+  }
+
+  async function loadMessageFeedback(sid) {
+    _fbState.clear();
+    if (!sid) return;
+    try {
+      const headers = {};
+      if (isGuestMode) headers["X-Guest-Id"] = guestId();
+      else headers["Authorization"] = `Bearer ${await currentUser.getIdToken()}`;
+      const res = await fetch(`${BASE_URL}/feedback/message?session_id=${encodeURIComponent(sid)}`, { headers });
+      if (!res.ok) return;
+      for (const row of await res.json()) {
+        _fbState.set(row.answer_index, { vote: row.vote, reasons: row.reasons || [], comment: row.comment || "" });
+      }
+      document.querySelectorAll(".msg-actions[data-answer-index]").forEach(bar => {
+        const saved = _fbState.get(Number(bar.dataset.answerIndex));
+        if (saved) _markFeedbackDone(bar, saved.vote);
+      });
+    } catch (_) { /* 回饋狀態載入失敗不影響對話 */ }
   }
 
   function showTyping() {
@@ -1999,7 +2116,7 @@
     row.scrollIntoView({ block: "end", behavior: "smooth" });
   }
 
-  function _finalizeStream(row, content, judgeEvt, answerMs) {
+  function _finalizeStream(row, content, judgeEvt, answerMs, answerIndex = null) {
     const bubble = row.querySelector("#stream-bubble");
     if (bubble) { bubble.id = ""; bubble.innerHTML = marked.parse(content || ""); }
     row.querySelector("#stream-cur")?.remove();
@@ -2008,6 +2125,9 @@
     body.querySelector(".meta")?.remove();
     body.querySelector(".judge-panel")?.remove();
     body.insertAdjacentHTML("beforeend", _buildMeta(judgeEvt, answerMs));
+    if (answerIndex !== null && content) {
+      body.insertAdjacentHTML("beforeend", _feedbackBarHtml(answerIndex, judgeEvt));
+    }
     row.scrollIntoView({ block: "end", behavior: "smooth" });
   }
 
@@ -2149,9 +2269,15 @@
     if (example) {
       const question = t("exampleQuestions")[Number(example.dataset.exampleIndex)];
       if (question) {
-        ta.value = question;
+        ta.value = question.text;
         send();
       }
+      return;
+    }
+    const fbBtn = e.target.closest(".fb-btn");
+    if (fbBtn) {
+      const bar = fbBtn.closest(".msg-actions[data-answer-index]");
+      if (bar) _handleFeedbackClick(fbBtn, bar);
       return;
     }
     const card = e.target.closest(".file-card[data-gcs]");
@@ -2290,7 +2416,7 @@
               fullText += evt.content;
               _updateStream(streamRow, fullText);
             } else if (evt.type === "done" && streamRow) {
-              _finalizeStream(streamRow, fullText, judgeEvt, evt.answer_elapsed_ms);
+              _finalizeStream(streamRow, fullText, judgeEvt, evt.answer_elapsed_ms, sessionAnswerCount++);
               sessionQuestionCount += 1;
               if (isGuestMode && fullText) {
                 guestHistory.push(
@@ -2315,7 +2441,7 @@
     } catch (e) {
       document.getElementById("typing")?.remove();
       if (e.name === "AbortError") {
-        if (streamRow && fullText) _finalizeStream(streamRow, fullText, judgeEvt, null);
+        if (streamRow && fullText) _finalizeStream(streamRow, fullText, judgeEvt, null, sessionAnswerCount++);
       } else {
         if (!streamRow) appendMsg("ai", "&#x26A0;&#xFE0F; " + e.message);
       }
@@ -2330,10 +2456,7 @@
     zh: {
       title:            "NTPU AI",
       adminBtn:         "管理員",
-      aboutMenu:        "運作方式",
-      aboutTitle:       "About · 運作方式",
-      aboutGeneral:     "一般版",
-      aboutTechnical:   "技術版",
+      aboutMenu:        "系統介紹",
       logoutBtn:        "登出",
       logoutConfirm:    "確定要登出嗎？",
       newChatBtn:       "＋ 新對話",
@@ -2341,12 +2464,40 @@
       welcomeH2:        "有什麼我能幫你的？",
       welcomeP:         "系統會自動判斷問題難度，並在小／中／大級距中選擇合適模型",
       exampleQuestions: [
-        "幫我寫一封向教授請假的 email",
-        "用簡單的方式解釋什麼是機器學習",
-        "幫我規劃一份一週讀書計畫",
+        { label: "AI 對話｜基礎知識", text: "用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini" },
+        { label: "學術搜尋｜研究探索", text: "找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因" },
+        { label: "分析推理｜專題規劃", text: "提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目" },
       ],
       placeholder:      "輸入訊息… (Enter 送出，Shift+Enter 換行)",
       hint:             "AI 可能出錯，重要內容請自行驗證",
+      fbHelpful:        "這個回答有幫助",
+      fbNotHelpful:     "這個回答有問題",
+      fbThanks:         "已送出，謝謝你的回饋",
+      fbPanelTitle:     "這個回答哪裡有問題？（可複選）",
+      fbReasons:        {
+        wrong:      "資訊錯誤，與實際規定不符",
+        outdated:   "資訊過時",
+        off_topic:  "答非所問，沒回答到我的問題",
+        too_vague:  "太籠統，不夠具體",
+        no_source:  "找不到出處，或來源連結有誤",
+        other:      "其他",
+      },
+      fbCommentPlaceholder: "可以再多說一點嗎？（選填）",
+      fbPrivacyHint:    "請勿填寫身分證字號、學號等個人資料。",
+      fbSubmit:         "送出",
+      fbCancel:         "取消",
+      fbFail:           "送出失敗：",
+      statsMsgTitle:    "回答層級回饋（每則訊息的讚／倒讚）",
+      statsMsgTotal:    "回饋則數",
+      statsMsgUp:       "讚",
+      statsMsgDown:     "倒讚",
+      statsMsgPositive: "好評率",
+      statsMsgReasonTitle: "倒讚原因分佈",
+      statsMsgReasonCols:["原因","次數"],
+      statsMsgByModelCols:["模型","讚","倒讚","好評率"],
+      statsMsgCommentTitle: "倒讚明細",
+      statsMsgCommentCols:["使用者／訪客","模型","原因","補充說明","時間"],
+      statsMsgEmpty:    "這段期間還沒有回答層級的回饋",
       surveyTitle:      "這次對話對你有幫助嗎？",
       surveySubtitle:   "此對話已達 3 個問題，請用一秒鐘告訴我們你的感受",
       surveyRatingLabels:["非常不滿意","不滿意","普通","滿意","非常滿意"],
@@ -2525,10 +2676,7 @@
     en: {
       title:            "NTPU AI",
       adminBtn:         "Admin",
-      aboutMenu:        "How it works",
-      aboutTitle:       "About · How it works",
-      aboutGeneral:     "For everyone",
-      aboutTechnical:   "For technical readers",
+      aboutMenu:        "About the system",
       logoutBtn:        "Logout",
       logoutConfirm:    "Are you sure you want to sign out?",
       newChatBtn:       "＋ New Chat",
@@ -2536,12 +2684,40 @@
       welcomeH2:        "How can I help you?",
       welcomeP:         "The system auto-routes your question to the right model within small, medium, or large tiers",
       exampleQuestions: [
-        "Write an email asking my professor for leave",
-        "Explain machine learning in simple terms",
-        "Help me create a one-week study plan",
+        { label: "AI chat | Fundamentals", text: "Explain generative AI with simple examples, and compare ChatGPT, Claude and Gemini" },
+        { label: "Academic search | Research", text: "Find the 3 most important AI papers and summarize their key findings and why they're worth reading" },
+        { label: "Reasoning | Project planning", text: "Suggest 3 interdisciplinary AI final-project topics, assess each on data availability, research value and two-week feasibility, then recommend the best one" },
       ],
       placeholder:      "Type a message… (Enter to send, Shift+Enter for newline)",
       hint:             "AI may make mistakes. Please verify important information.",
+      fbHelpful:        "This answer was helpful",
+      fbNotHelpful:     "Something is wrong with this answer",
+      fbThanks:         "Sent — thanks for the feedback",
+      fbPanelTitle:     "What was wrong with this answer? (select all that apply)",
+      fbReasons:        {
+        wrong:      "Incorrect — it doesn't match the actual rules",
+        outdated:   "Out of date",
+        off_topic:  "It didn't answer my question",
+        too_vague:  "Too vague, not specific enough",
+        no_source:  "No source, or the source link is wrong",
+        other:      "Other",
+      },
+      fbCommentPlaceholder: "Anything you'd like to add? (optional)",
+      fbPrivacyHint:    "Please don't include ID numbers, student numbers or other personal data.",
+      fbSubmit:         "Submit",
+      fbCancel:         "Cancel",
+      fbFail:           "Could not send: ",
+      statsMsgTitle:    "Answer-level feedback (per-message votes)",
+      statsMsgTotal:    "Votes",
+      statsMsgUp:       "Helpful",
+      statsMsgDown:     "Not helpful",
+      statsMsgPositive: "Positive rate",
+      statsMsgReasonTitle: "Reasons given",
+      statsMsgReasonCols:["Reason","Count"],
+      statsMsgByModelCols:["Model","Helpful","Not helpful","Positive rate"],
+      statsMsgCommentTitle: "Negative feedback detail",
+      statsMsgCommentCols:["User / Guest","Model","Reasons","Comment","Timestamp"],
+      statsMsgEmpty:    "No answer-level feedback in this period",
       surveyTitle:      "Was this conversation helpful?",
       surveySubtitle:   "This session has reached 3 questions—tell us how it went",
       surveyRatingLabels:["Very dissatisfied","Dissatisfied","Neutral","Satisfied","Very satisfied"],
@@ -2749,10 +2925,6 @@
     document.getElementById("userMenuAdminLabel").textContent = L.adminBtn;
     document.getElementById("userMenuAboutLabel").textContent = L.aboutMenu;
     document.getElementById("userMenuSettingsLabel").textContent = L.settingsTitle;
-    document.getElementById("about-title").textContent = L.aboutTitle;
-    document.getElementById("about-tab-general").textContent = L.aboutGeneral;
-    document.getElementById("about-tab-technical").textContent = L.aboutTechnical;
-    if (!document.getElementById("about-overlay").classList.contains("hidden")) renderAbout();
     document.querySelector(".admin-header h2").textContent = L.adminPanelTitle;
     const tabBtns = document.querySelectorAll(".tab-btn");
     if (tabBtns.length >= 3) {
@@ -2826,7 +2998,11 @@
     if (wp) wp.textContent = L.welcomeP;
     document.querySelectorAll(".example-question[data-example-index]").forEach(btn => {
       const question = L.exampleQuestions[Number(btn.dataset.exampleIndex)];
-      if (question) btn.textContent = question;
+      if (!question) return;
+      const label = btn.querySelector(".eq-label");
+      const text  = btn.querySelector(".eq-text");
+      if (label) label.textContent = question.label;
+      if (text)  text.textContent  = question.text;
     });
     // Conv list empty state
     const ce = document.querySelector(".conv-empty");
@@ -3068,6 +3244,35 @@
           item.session_id || "", item.rating || 0, item.question_count || 0, item.timestamp || "",
         ].map(_csvCell));
       }
+      const msgFb = data.message_feedback || {};
+      if (msgFb.total) {
+        const reasonLabels = t("fbReasons");
+        lines.push([], [
+          _csvCell(zh ? "回答回饋總計" : "Answer feedback total"), _csvCell(msgFb.total),
+          _csvCell(zh ? "讚" : "Helpful"), _csvCell(msgFb.up || 0),
+          _csvCell(zh ? "倒讚" : "Not helpful"), _csvCell(msgFb.down || 0),
+          _csvCell(zh ? "好評率" : "Positive rate"), _csvCell(`${msgFb.positive_percent || 0}%`),
+        ]);
+        lines.push([], [_csvCell(zh ? "倒讚原因" : "Reason"), _csvCell(zh ? "次數" : "Count")]);
+        for (const key of Object.keys(reasonLabels)) {
+          lines.push([reasonLabels[key], (msgFb.reasons || {})[key] || 0].map(_csvCell));
+        }
+        lines.push([], (zh
+          ? ["倒讚明細","類型","模型","Session ID","回答序號","原因","補充說明","時間"]
+          : ["Negative feedback","Type","Model","Session ID","Answer #","Reasons","Comment","Timestamp"]
+        ).map(_csvCell));
+        for (const c of (msgFb.comments || [])) {
+          const label = c.is_guest
+            ? `${t("statsGuest")} #${String(c.uid || "").split(":").pop()}`
+            : (c.email || c.uid);
+          lines.push([
+            label, c.is_guest ? (zh ? "訪客" : "Guest") : (zh ? "登入者" : "Signed-in"),
+            c.model || "", c.session_id || "", c.answer_index ?? "",
+            (c.reasons || []).map(r => reasonLabels[r] || r).join(" / "),
+            c.comment || "", c.timestamp || "",
+          ].map(_csvCell));
+        }
+      }
       const csv = "\ufeff" + lines.map(row => row.join(",")).join("\r\n");
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
@@ -3175,6 +3380,67 @@
           <div class="stats-summary-card"><span>${t("statsSurveyRate")}</span><strong>${satisfaction.response_rate || 0}%</strong></div>
         </div>`;
 
+      // ── 回答層級回饋 ──
+      const msgFb = data.message_feedback || {};
+      const reasonLabels = t("fbReasons");
+      const reasonRows = Object.keys(reasonLabels)
+        .map(key => [key, (msgFb.reasons || {})[key] || 0])
+        .sort((a, b) => b[1] - a[1])
+        .filter(([, count]) => count > 0)
+        .map(([key, count]) => `<tr><td>${_esc(reasonLabels[key])}</td><td style="text-align:center;font-weight:600">${count}</td></tr>`)
+        .join("");
+      const msgModelRows = (msgFb.by_model || []).map(m => {
+        const total = (m.up || 0) + (m.down || 0);
+        const rate = total ? Math.round((m.up || 0) * 1000 / total) / 10 : 0;
+        return `<tr>
+          <td>${_esc(_modelFullName(m.model))}</td>
+          <td style="text-align:center">${m.up || 0}</td>
+          <td style="text-align:center">${m.down || 0}</td>
+          <td style="text-align:center;font-weight:600">${rate}%</td>
+        </tr>`;
+      }).join("");
+      const commentRows = (msgFb.comments || []).map(c => {
+        const label = c.is_guest
+          ? `${t("statsGuest")} #${String(c.uid || "").split(":").pop()}`
+          : (c.email || c.uid);
+        const reasons = (c.reasons || []).map(r => reasonLabels[r] || r).join("、") || "—";
+        return `<tr>
+          <td>${_esc(label)}</td>
+          <td>${_esc(c.model ? _modelFullName(c.model) : "—")}</td>
+          <td>${_esc(reasons)}</td>
+          <td>${_esc(c.comment || "—")}</td>
+          <td style="white-space:nowrap">${_esc((c.timestamp || "").replace("T", " ").slice(0, 16))}</td>
+        </tr>`;
+      }).join("");
+      const msgCols = t("statsMsgByModelCols");
+      const reasonCols = t("statsMsgReasonCols");
+      const commentCols = t("statsMsgCommentCols");
+      const messageFeedbackHtml = `
+        <p style="font-size:13px;font-weight:600;color:var(--text2);margin:26px 0 8px">${t("statsMsgTitle")}</p>
+        ${!msgFb.total ? `<div class="a-notice">${t("statsMsgEmpty")}</div>` : `
+        <div class="stats-summary">
+          <div class="stats-summary-card"><span>${t("statsMsgTotal")}</span><strong>${msgFb.total}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsMsgUp")}</span><strong>${msgFb.up || 0}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsMsgDown")}</span><strong>${msgFb.down || 0}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsMsgPositive")}</span><strong>${msgFb.positive_percent || 0}%</strong></div>
+        </div>
+        ${msgModelRows ? `<table class="a-table" style="margin-top:14px">
+          <thead><tr>${msgCols.map((c,i) => `<th${i>0?' style="text-align:center"':''}>${c}</th>`).join("")}</tr></thead>
+          <tbody>${msgModelRows}</tbody>
+        </table>` : ""}
+        ${reasonRows ? `
+        <p style="font-size:13px;font-weight:600;color:var(--text2);margin:22px 0 8px">${t("statsMsgReasonTitle")}</p>
+        <table class="a-table">
+          <thead><tr>${reasonCols.map((c,i) => `<th${i>0?' style="text-align:center"':''}>${c}</th>`).join("")}</tr></thead>
+          <tbody>${reasonRows}</tbody>
+        </table>` : ""}
+        ${commentRows ? `
+        <p style="font-size:13px;font-weight:600;color:var(--text2);margin:22px 0 8px">${t("statsMsgCommentTitle")}</p>
+        <table class="a-table">
+          <thead><tr>${commentCols.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+          <tbody>${commentRows}</tbody>
+        </table>` : ""}`}`;
+
       el.innerHTML = `
         <p style="font-size:12px;color:var(--text4);margin-bottom:12px">${t("statsRange")}</p>
         ${satisfactionHtml}
@@ -3184,7 +3450,8 @@
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        ${modelTable}`;
+        ${modelTable}
+        ${messageFeedbackHtml}`;
     } catch (e) {
       el.innerHTML = `<div class="a-notice" style="color:var(--danger)">${t("loadingFail")}${e.message}</div>`;
     }
@@ -3312,131 +3579,12 @@
     }
   }
 
-  // ── About / How it works ──
-  let _aboutView = "general";
-
-  function _aboutIcon(kind) {
-    const icons = {
-      ask: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-15a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/>',
-      route: '<circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 12h4a4 4 0 0 0 4-4V6h2M11 12a4 4 0 0 1 4 4v2h2"/>',
-      tools: '<circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/><path d="M8 11h6M11 8v6"/>',
-      answer: '<polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-      shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 9"/>',
-      server: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><circle cx="7" cy="7" r=".7" fill="currentColor"/><circle cx="7" cy="17" r=".7" fill="currentColor"/>',
-      brain: '<path d="M9.5 4.5A3 3 0 0 0 4 6v2a3 3 0 0 0 0 5v2a3 3 0 0 0 5.5 1.5M14.5 4.5A3 3 0 0 1 20 6v2a3 3 0 0 1 0 5v2a3 3 0 0 1-5.5 1.5M12 3v18M8 9h4M12 15h4"/>',
-    };
-    return _svg(icons[kind] || icons.ask, 20);
-  }
-
-  function _aboutData() {
-    if (_lang === "en") {
-      return _aboutView === "general" ? {
-        title: "From your question to a useful answer",
-        intro: "NTPU AI handles model choice and tools for you. You can simply describe what you need.",
-        steps: [
-          ["ask","Ask naturally","Type a question or attach a file when you need the AI to read it."],
-          ["route","Understand the task","The system estimates difficulty and selects an appropriate model tier."],
-          ["tools","Use tools when needed","File-reading tools are only used when the request needs them."],
-          ["answer","Stream the answer","The answer appears as it is generated, so you do not wait for the whole response."],
-        ],
-        details: [
-          ["Guest or signed in","Guests can chat and upload without creating an account. Signed-in users can save chats and memory."],
-          ["Privacy boundary","Guest chat content is not saved. Usage statistics do not include question or answer text."],
-          ["Session statistics","Every chat session is counted. A one-tap satisfaction survey appears after 3 completed questions."],
-        ],
-        note: "AI can still make mistakes. Verify important academic, administrative, medical, legal or financial information.",
-      } : {
-        title: "Request lifecycle and data boundaries",
-        intro: "The browser, router, tools, model gateway and storage layers are separated so each layer has a narrow responsibility.",
-        steps: [
-          ["ask","Client","Cloudflare-signed token or a random guest ID, session ID, message and optional tool flags."],
-          ["shield","Worker boundary","Validation, NTPU account policy and guest attachment isolation run at the edge."],
-          ["brain","Judge and routing","Mistral Small 4 scores the task and selects the original small, medium or large model pool."],
-          ["server","OpenRouter models","The Worker calls the selected Claude or Gemini model through OpenRouter."],
-          ["answer","SSE response","Tokens stream to the browser; usage and eligible signed-in history are persisted afterward."],
-        ],
-        details: [
-          ["Identity","Signed-in requests use Worker HMAC tokens. Guest statistics use a SHA-256 pseudonym plus an AES-GCM encrypted recovery ID."],
-          ["Storage","Cloudflare D1 stores signed-in sessions, usage and CSAT. R2 stores isolated attachments. Guest conversation text is not persisted."],
-          ["Metrics","Every session ID is counted from its first completed request. At 3 requests it becomes eligible for the survey; CSAT uses ratings 4–5."],
-        ],
-        note: "System prompts, user memory and retrieved context are assembled server-side before the selected model is called; secrets never enter frontend code.",
-      };
-    }
-    return _aboutView === "general" ? {
-      title: "從你的問題，到一個有用的回答",
-      intro: "模型選擇與工具判斷都由 NTPU AI 處理，你只要直接說明需要什麼。",
-      steps: [
-        ["ask","自然提問","輸入問題，或在需要 AI 閱讀資料時附加檔案。"],
-        ["route","理解需求","系統判斷問題難度，自動選擇適合的小／中／大模型級距。"],
-        ["tools","需要時使用工具","只有問題需要時，才會使用檔案閱讀工具補充資料。"],
-        ["answer","即時產生回答","內容會一邊生成一邊顯示，不必等完整答案全部完成。"],
-      ],
-      details: [
-        ["訪客或登入都能用","訪客不必建立帳號，也能聊天與上傳檔案；登入後則能保存對話與長期記憶。"],
-        ["清楚的隱私邊界","訪客對話內容不保存；使用統計也不會記錄問題或回答文字。"],
-        ["Session 統計","每個對話 Session 都會計入統計；完成 3 個問題後，才會出現一次一鍵滿意度調查。"],
-      ],
-      note: "AI 仍可能出錯；重要的學業、行政、醫療、法律或財務資訊，請再向可靠來源確認。",
-    } : {
-      title: "請求生命週期與資料邊界",
-      intro: "瀏覽器、Router、工具、模型閘道與儲存層彼此分離，每一層只負責明確的工作。",
-      steps: [
-        ["ask","Client","送出 Worker 簽發權杖或隨機訪客 ID、Session ID、訊息與工具開關。"],
-        ["shield","Worker 邊界","在 Cloudflare Edge 執行驗證、NTPU 帳號政策與訪客附件隔離。"],
-        ["brain","Judge 與路由","Mistral Small 4 依原版規則評分，選擇 small／medium／large 候選池。"],
-        ["server","OpenRouter 模型","Worker 透過 OpenRouter 呼叫 Judge 選定的 Claude 或 Gemini 模型。"],
-        ["answer","SSE 串流","Token 串流回瀏覽器，之後背景寫入用量及符合條件的登入者對話。"],
-      ],
-      details: [
-        ["身分識別","登入者使用 Worker HMAC 權杖；訪客統計直接使用瀏覽器產生的隨機訪客 ID。"],
-        ["資料儲存","Cloudflare D1 保存登入者 Session、用量與 CSAT；R2 隔離保存附件；訪客對話文字不落地。"],
-        ["統計定義","每個 Session ID 從第 1 個完成請求起就會計數；累積 3 題後才符合問卷資格，CSAT 以 4–5 分計算。"],
-      ],
-      note: "System Prompt、使用者記憶與檢索內容會在伺服器端組合後才呼叫模型；Secret 不會進入前端程式。",
-    };
-  }
-
-  function renderAbout() {
-    const data = _aboutData();
-    const stepWord = _lang === "zh" ? "步驟" : "Stage";
-    const flow = data.steps.map((step, index) => `
-      <div class="about-card">
-        <div class="about-card-icon">${_aboutIcon(step[0])}</div>
-        <div class="about-step">${stepWord} ${index + 1}</div>
-        <strong>${_esc(step[1])}</strong><p>${_esc(step[2])}</p>
-      </div>${index < data.steps.length - 1 ? '<div class="about-arrow" aria-hidden="true">→</div>' : ''}
-    `).join("");
-    const details = data.details.map(item => `
-      <div class="about-detail"><strong>${_esc(item[0])}</strong><p>${_esc(item[1])}</p></div>
-    `).join("");
-    document.getElementById("about-content").innerHTML = `
-      <div class="about-intro"><h4>${_esc(data.title)}</h4><p>${_esc(data.intro)}</p></div>
-      <div class="about-flow">${flow}</div>
-      <div class="about-detail-grid">${details}</div>
-      <div class="about-note">${_esc(data.note)}</div>`;
-  }
+  // ── About / How it works (external page) ──
+  const ABOUT_URL = "/about";
 
   function openAbout() {
-    _aboutView = "general";
-    document.getElementById("about-overlay").classList.remove("hidden");
-    switchAboutView("general");
+    window.open(ABOUT_URL, "_blank", "noopener");
   }
-
-  function closeAbout() {
-    document.getElementById("about-overlay").classList.add("hidden");
-  }
-
-  function switchAboutView(view) {
-    _aboutView = view === "technical" ? "technical" : "general";
-    document.getElementById("about-tab-general").classList.toggle("active", _aboutView === "general");
-    document.getElementById("about-tab-technical").classList.toggle("active", _aboutView === "technical");
-    renderAbout();
-  }
-
-  document.getElementById("about-overlay").addEventListener("click", function(e) {
-    if (e.target === this) closeAbout();
-  });
 
   // ── Settings ──
   function openSettings() {
@@ -3711,6 +3859,7 @@
       document.getElementById("share-view-title").textContent = title;
       document.title = title + " — NTPU AI";
       if (data.history?.length) {
+        _readOnlyView = true;
         renderLoadedHistory(data.history);
       } else {
         document.querySelector("#messages .inner").innerHTML =

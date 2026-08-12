@@ -83,12 +83,52 @@ async function transcribe(req, env) {
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out }); if (!response.ok) return error("語音轉文字失敗", 502); return new Response(response.body, { headers: { "content-type": "application/json" } });
 }
 
+export const MESSAGE_FEEDBACK_REASONS = ["wrong", "outdated", "off_topic", "too_vague", "no_source", "other"];
+
+async function messageFeedback(req, env, url) {
+  const user = await authenticate(req, env, false);
+  const guest = req.headers.get("x-guest-id") || "";
+  if (!user && !/^[a-f0-9]{32}$/.test(guest)) return error("Missing auth token or guest ID", 401);
+  const statsUid = user?.uid || `guest:${guest}`;
+
+  if (req.method === "GET") {
+    const sessionId = url.searchParams.get("session_id") || "";
+    if (!sessionId) return error("缺少 session_id", 400);
+    const rows = await env.DB.prepare("SELECT answer_index,vote,reasons,comment FROM message_feedback WHERE stats_uid=? AND session_id=?").bind(statsUid, sessionId).all();
+    return json((rows.results || []).map(x => ({ answer_index: x.answer_index, vote: x.vote, reasons: safeJson(x.reasons, []), comment: x.comment || "" })));
+  }
+  if (req.method !== "POST") return error("Not found", 404);
+
+  const body = await req.json().catch(() => null);
+  if (!body?.session_id) return error("缺少 session_id", 400);
+  const answerIndex = Number(body.answer_index);
+  if (!Number.isInteger(answerIndex) || answerIndex < 0) return error("answer_index 不正確", 400);
+  if (body.vote === null) {
+    await env.DB.prepare("DELETE FROM message_feedback WHERE stats_uid=? AND session_id=? AND answer_index=?").bind(statsUid, body.session_id, answerIndex).run();
+    return json({ ok: true, vote: null });
+  }
+  if (!["up", "down"].includes(body.vote)) return error("vote 只能是 up 或 down", 400);
+  const reasons = body.vote === "down" && Array.isArray(body.reasons)
+    ? [...new Set(body.reasons.filter(x => MESSAGE_FEEDBACK_REASONS.includes(x)))]
+    : [];
+  const comment = body.vote === "down" ? String(body.comment || "").trim().slice(0, 1000) : "";
+  await env.DB.prepare(`
+    INSERT INTO message_feedback(stats_uid,session_id,answer_index,vote,reasons,comment,is_guest,email,model,route,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(stats_uid,session_id,answer_index) DO UPDATE SET
+      vote=excluded.vote,reasons=excluded.reasons,comment=excluded.comment,
+      model=excluded.model,route=excluded.route,created_at=excluded.created_at
+  `).bind(statsUid, body.session_id, answerIndex, body.vote, JSON.stringify(reasons), comment, user ? 0 : 1, user?.email || "", String(body.model || "").slice(0, 60), String(body.route || "").slice(0, 20), nowIso()).run();
+  return json({ ok: true, vote: body.vote });
+}
+
 export async function adminStats(env, url) {
   const start = url.searchParams.get("start") || new Date(Date.now() - 30 * 86400000).toISOString();
   const end = url.searchParams.get("end") || nowIso();
-  const [usageResult, feedbackResult] = await env.DB.batch([
+  const [usageResult, feedbackResult, messageResult] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM usage_logs WHERE created_at>=? AND created_at<? ORDER BY created_at DESC LIMIT 20000").bind(start, end),
     env.DB.prepare("SELECT * FROM feedback WHERE created_at>=? AND created_at<? ORDER BY created_at DESC LIMIT 20000").bind(start, end),
+    env.DB.prepare("SELECT * FROM message_feedback WHERE created_at>=? AND created_at<? ORDER BY created_at DESC LIMIT 20000").bind(start, end),
   ]);
   const userMap = new Map(), sessionMap = new Map(), modelMap = new Map(), legacyGuestUidMap = new Map();
   for (const row of usageResult.results || []) {
@@ -125,7 +165,41 @@ export async function adminStats(env, url) {
   const distribution = { "1":0,"2":0,"3":0,"4":0,"5":0 }; let sum=0, positive=0;
   const feedback = (feedbackResult.results || []).filter(x => x.rating>=1 && x.rating<=5).map(x => { distribution[String(x.rating)]++; sum+=x.rating; if(x.rating>=4)positive++; return { uid:legacyGuestUidMap.get(x.stats_uid)||x.stats_uid,email:x.email||"",is_guest:!!x.is_guest,session_id:x.session_id,rating:x.rating,question_count:x.question_count||0,timestamp:x.created_at }; });
   const responses=feedback.length;
-  return { users, by_model, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
+
+  // ── 每則回答的讚／倒讚 ──
+  const reasonCounts = Object.fromEntries(MESSAGE_FEEDBACK_REASONS.map(x => [x, 0]));
+  const messageModelMap = new Map();
+  let up = 0, down = 0, withComment = 0;
+  const messageComments = [];
+  for (const row of messageResult?.results || []) {
+    const uid = legacyGuestUidMap.get(row.stats_uid) || row.stats_uid;
+    if (row.vote === "up") up++; else down++;
+    if (row.model) {
+      if (!messageModelMap.has(row.model)) messageModelMap.set(row.model, { model: row.model, up: 0, down: 0 });
+      messageModelMap.get(row.model)[row.vote === "up" ? "up" : "down"]++;
+    }
+    const reasons = safeJson(row.reasons, []) || [];
+    for (const reason of reasons) if (reason in reasonCounts) reasonCounts[reason]++;
+    if (row.vote === "down") {
+      if (row.comment) withComment++;
+      messageComments.push({
+        uid, email: row.email || "", is_guest: !!row.is_guest, session_id: row.session_id,
+        answer_index: row.answer_index, model: row.model || "", route: row.route || "",
+        reasons, comment: row.comment || "", timestamp: row.created_at,
+      });
+    }
+  }
+  const messageTotal = up + down;
+  const message_feedback = {
+    total: messageTotal, up, down,
+    positive_percent: messageTotal ? Math.round(up * 1000 / messageTotal) / 10 : 0,
+    with_comment: withComment,
+    reasons: reasonCounts,
+    by_model: [...messageModelMap.values()].sort((a,b) => (b.up+b.down)-(a.up+a.down)),
+    comments: messageComments.slice(0, 200),
+  };
+
+  return { users, by_model, message_feedback, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
 }
 
 async function admin(req, env, url) {
@@ -161,6 +235,7 @@ async function api(req, env) {
   if (p === "/user/profile") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT system_prompt FROM profiles WHERE uid=?").bind(u.uid).first();return json({system_prompt:x?.system_prompt||""});} const b=await req.json();await env.DB.prepare("INSERT INTO profiles(uid,system_prompt) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET system_prompt=excluded.system_prompt").bind(u.uid,String(b.system_prompt||"").slice(0,10000)).run();return json({ok:true}); }
   if (p === "/user/memory") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT memory FROM profiles WHERE uid=?").bind(u.uid).first();return json({memory:x?.memory||""});} await env.DB.prepare("UPDATE profiles SET memory='',memory_updated_at=NULL WHERE uid=?").bind(u.uid).run();return json({ok:true}); }
   if (p === "/feedback/session" && req.method === "POST") { const u=await authenticate(req,env,false); const guest=req.headers.get("x-guest-id")||""; if(!u&&!/^[a-f0-9]{32}$/.test(guest))return error("Missing auth token or guest ID",401); const b=await req.json(); const stats=u?.uid || `guest:${guest}`; const count=u?(await env.DB.prepare("SELECT question_count n FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,b.session_id).first())?.n:(await env.DB.prepare("SELECT COUNT(*) n FROM usage_logs WHERE stats_uid=? AND session_id=?").bind(stats,b.session_id).first())?.n; if(count<3)return error("此對話尚未達到 3 個問題，不能列為有效 session",400);await env.DB.prepare("INSERT INTO feedback(stats_uid,session_id,rating,is_guest,created_at,email,question_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(stats_uid,session_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at,email=excluded.email,question_count=excluded.question_count").bind(stats,b.session_id,b.rating,u?0:1,nowIso(),u?.email||"",count).run();return json({ok:true,question_count:count}); }
+  if (p === "/feedback/message") return messageFeedback(req, env, url);
   const shared=pathMatch(p,/^\/share\/([^/]+)$/); if(shared){const x=await env.DB.prepare("SELECT title,history_json FROM shares WHERE share_id=?").bind(shared[1]).first();return x?json({title:x.title,history:safeJson(x.history_json,[])}):error("分享連結不存在",404);}
   if (p.startsWith("/admin/")) return admin(req,env,url);
   return null;
