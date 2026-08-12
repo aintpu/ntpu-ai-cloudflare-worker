@@ -80,6 +80,33 @@ test("管理統計維持原版 users/by_model/satisfaction/feedback 格式", asy
   assert.equal(data.feedback[0].question_count, 3);
 });
 
+test("管理統計彙整每則回答的讚／倒讚與原因", async () => {
+  const messages = [
+    { stats_uid:"guest:abcdefghijklmnop",email:"",session_id:"s1",answer_index:0,vote:"up",reasons:"[]",comment:"",is_guest:1,model:"cloud-small-claude",route:"small",created_at:"2026-08-11T00:02:00Z" },
+    { stats_uid:"u_a",email:"a@gm.ntpu.edu.tw",session_id:"s3",answer_index:1,vote:"down",reasons:'["wrong","outdated"]',comment:"規定已經改了",is_guest:0,model:"cloud-small-claude",route:"small",created_at:"2026-08-11T00:03:00Z" },
+  ];
+  const fakeEnv = { DB: { prepare: sql => ({ bind: () => ({ sql }) }), batch: async () => [{ results: [] }, { results: [] }, { results: messages }] } };
+  const data = await adminStats(fakeEnv, new URL("https://example.com/admin/stats"));
+  assert.equal(data.message_feedback.total, 2);
+  assert.equal(data.message_feedback.up, 1);
+  assert.equal(data.message_feedback.down, 1);
+  assert.equal(data.message_feedback.positive_percent, 50);
+  assert.equal(data.message_feedback.reasons.wrong, 1);
+  assert.equal(data.message_feedback.reasons.outdated, 1);
+  assert.equal(data.message_feedback.by_model[0].model, "cloud-small-claude");
+  assert.equal(data.message_feedback.comments.length, 1);
+  assert.equal(data.message_feedback.comments[0].comment, "規定已經改了");
+});
+
+test("每則回答都有讚／倒讚，倒讚可填原因", async () => {
+  const [html, index] = await Promise.all([readFile("public/index.html", "utf8"), readFile("src/index.js", "utf8")]);
+  assert.match(html, /class="fb-btn fb-up/);
+  assert.match(html, /class="fb-btn fb-down/);
+  assert.match(html, /_feedbackPanelHtml/);
+  assert.match(index, /INSERT INTO message_feedback/);
+  assert.match(index, /vote 只能是 up 或 down/);
+});
+
 test("搜尋按鈕不出現在附件選單，三題後才顯示滿意度問卷", async () => {
   const html = await readFile("public/index.html", "utf8");
   assert.doesNotMatch(html, /id="menuSearchItem"/);

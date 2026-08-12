@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTPU AI · 系統說明</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f5f7fa;
+    --panel2:#eef2f7;
+    --ink:#141a24;
+    --ink2:#39424f;
+    --muted:#6b7482;
+    --line:#dde3ea;
+    --line2:#c3ccd7;
+    --brand:#23406e;
+    --brand2:#38618f;
+    --brand-tint:#e8eef6;
+    --gold:#a8792c;
+    --sans:"Noto Sans TC","PingFang TC","Helvetica Neue","Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --maxw:1000px;
+    --shadow:0 1px 2px rgba(20,26,36,.05),0 6px 20px rgba(20,26,36,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e1116; --panel:#151a21; --panel2:#1b212a; --ink:#e9edf2; --ink2:#c3cad4;
+      --muted:#8b95a3; --line:#262d38; --line2:#39424f;
+      --brand:#93b4e0; --brand2:#7ea3d6; --brand-tint:#182231; --gold:#d0a45c;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.28);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.8;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .zh{display:inline}.en{display:none}
+  body.lang-en .zh{display:none}
+  body.lang-en .en{display:inline}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  /* ---------- header ---------- */
+  header{
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;
+    background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
+  }
+  .nav{display:flex;align-items:center;gap:14px;height:60px}
+  .home{display:flex;align-items:center;gap:11px;text-decoration:none}
+  .mark{
+    width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;
+    background:var(--brand);color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em;
+  }
+  @media (prefers-color-scheme:dark){.mark{color:#0e1116}}
+  .home .name{font-weight:700;font-size:15.5px;letter-spacing:.01em}
+  .home .sub{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:-4px}
+  .langbtn{
+    margin-left:auto;font:inherit;font-size:13px;background:none;border:1px solid var(--line2);
+    color:var(--ink);padding:6px 13px;border-radius:999px;cursor:pointer;transition:border-color .15s,color .15s,background .15s;
+  }
+  .langbtn:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-tint)}
+
+  /* ---------- intro ---------- */
+  .intro{padding:56px 0 40px;background:linear-gradient(180deg,var(--brand-tint),transparent);border-bottom:1px solid var(--line)}
+  .kicker{
+    display:inline-block;font-size:12px;letter-spacing:.14em;color:var(--brand2);
+    border:1px solid var(--line2);border-radius:999px;padding:3px 12px;margin-bottom:18px;
+  }
+  h1{font-size:clamp(28px,3.6vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.25;margin-bottom:16px}
+  .intro p{color:var(--ink2);font-size:16.5px;max-width:70ch}
+  .intro p + p{margin-top:12px}
+
+  /* ---------- tabs ---------- */
+  .tabbar{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:60px;z-index:19}
+  .tabs{display:flex;align-items:center;gap:8px;padding:12px 0}
+  .tab{
+    font:inherit;font-size:14.5px;background:none;border:1px solid transparent;color:var(--muted);
+    padding:7px 18px;border-radius:999px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+  }
+  .tab:hover{color:var(--ink);background:var(--panel)}
+  .tab[aria-selected="true"]{color:#fff;background:var(--brand);border-color:var(--brand);font-weight:600}
+  @media (prefers-color-scheme:dark){.tab[aria-selected="true"]{color:#0e1116}}
+  .secnav{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap}
+  .secnav a{font-size:13px;color:var(--muted);text-decoration:none;padding:6px 0;border-bottom:2px solid transparent}
+  .secnav a:hover{color:var(--brand);border-bottom-color:var(--brand)}
+  body:not(.view-tech) .v-tech{display:none}
+  body.view-tech .v-general{display:none}
+  .secnav.v-general,.secnav.v-tech{display:flex}
+  body:not(.view-tech) .secnav.v-tech,body.view-tech .secnav.v-general{display:none}
+
+  /* ---------- sections ---------- */
+  section{padding:56px 0;scroll-margin-top:120px}
+  section.tint{background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .sechead{margin-bottom:30px}
+  h2{font-size:clamp(22px,2.6vw,27px);font-weight:700;letter-spacing:-.015em;display:flex;align-items:center;gap:14px}
+  h2 .num{
+    flex:none;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+    background:var(--brand-tint);color:var(--brand);font-family:var(--mono);font-size:14px;font-weight:600;
+    border:1px solid var(--line);
+  }
+  .lead{color:var(--muted);font-size:16px;margin-top:12px;max-width:74ch}
+  h3{font-size:16.5px;font-weight:650;margin-bottom:5px;letter-spacing:-.005em}
+  p{font-size:15.5px;color:var(--ink2)}
+  code{font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--line);padding:1px 6px;border-radius:5px;color:var(--ink2)}
+
+  /* cards */
+  .items{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .item{
+    background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:20px 22px;
+    box-shadow:var(--shadow);transition:border-color .15s,transform .15s;
+  }
+  .item:hover{border-color:var(--line2);transform:translateY(-1px)}
+  section.tint .item{background:var(--bg)}
+  .item p{color:var(--muted);font-size:14.8px;line-height:1.72}
+
+  /* feature list */
+  ul.plain{list-style:none;display:grid;gap:2px}
+  ul.plain li{
+    padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:var(--bg);
+    color:var(--ink2);font-size:15.5px;box-shadow:var(--shadow);
+  }
+  ul.plain b{font-weight:700;color:var(--ink)}
+  ul.plain{gap:12px}
+
+  /* steps */
+  .steps{position:relative;display:grid;gap:4px}
+  .steps{counter-reset:s}
+  .step{display:grid;grid-template-columns:38px 1fr;gap:18px;padding:16px 0;position:relative}
+  .step + .step{border-top:1px solid var(--line)}
+  .step::before{
+    counter-increment:s;content:counter(s);
+    width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+    background:var(--brand);color:#fff;font-family:var(--mono);font-size:13px;font-weight:600;margin-top:2px;
+  }
+  @media (prefers-color-scheme:dark){.step::before{color:#0e1116}}
+  .step p{color:var(--muted);font-size:15px}
+
+  /* tables */
+  .tablewrap{border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:8px;background:var(--bg)}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:13px 18px;border-top:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+  thead th{border-top:0;background:var(--panel2);color:var(--ink);font-weight:600;font-size:14px}
+  tbody th{color:var(--ink);font-weight:600;width:32%}
+  tbody tr:nth-child(even) td,tbody tr:nth-child(even) th{background:color-mix(in srgb,var(--panel) 55%,transparent)}
+  td.mono,th.mono{font-family:var(--mono);font-size:13.5px;color:var(--brand2)}
+
+  .note{
+    border-left:3px solid var(--gold);background:var(--panel2);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin-top:20px;color:var(--ink2);font-size:15px;
+  }
+
+  /* ---------- footer ---------- */
+  footer{background:var(--panel);border-top:1px solid var(--line);padding:40px 0;color:var(--muted);font-size:14.5px}
+  footer a{color:var(--brand);text-decoration:none;border-bottom:1px solid transparent}
+  footer a:hover{border-bottom-color:var(--brand)}
+  .flinks{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;font-size:15px}
+  .credit{
+    border-top:1px solid var(--line);padding-top:22px;line-height:1.75;
+    display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;
+  }
+  .credit .who{max-width:56ch}
+  .teamlink{
+    display:inline-flex;align-items:center;gap:9px;flex:none;
+    background:var(--brand);color:#fff;border:1px solid var(--brand);border-bottom:1px solid var(--brand);
+    padding:11px 20px;border-radius:999px;font-size:15px;font-weight:600;
+    box-shadow:var(--shadow);transition:background .15s,transform .15s,box-shadow .15s;
+  }
+  .teamlink:hover{background:var(--brand2);border-color:var(--brand2);border-bottom-color:var(--brand2);transform:translateY(-1px)}
+  .teamlink .arw{font-size:13px;opacity:.85}
+  @media (prefers-color-scheme:dark){.teamlink,.teamlink:hover{color:#0e1116}}
+
+  @media (max-width:860px){
+    .secnav{display:none!important}
+    .items{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 18px}
+    section{padding:40px 0}
+    .intro{padding:38px 0 30px}
+    tbody th{width:auto}
+    th,td{padding:11px 13px}
+    h2 .num{width:28px;height:28px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="home" href="/">
+      <span class="mark">AI</span>
+      <span><span class="name">NTPU AI</span><span class="sub"><span class="zh">系統說明</span><span class="en">System notes</span></span></span>
+    </a>
+    <button class="langbtn" id="langbtn" type="button"><span class="zh">English</span><span class="en">中文</span></button>
+  </div>
+</header>
+
+<div class="intro">
+  <div class="wrap">
+    <div class="kicker"><span class="zh">國立臺北大學</span><span class="en">National Taipei University</span></div>
+    <h1><span class="zh">NTPU AI 系統說明</span><span class="en">About NTPU AI</span></h1>
+    <p>
+      <span class="zh">NTPU AI 是國立臺北大學提供的對話式 AI 服務。介面只有一個輸入框：你把問題打進去，系統會先用一個小模型判斷這則訊息的難度，再決定交給哪一個等級的模型回答；答案以串流方式顯示，並在訊息上標出這次實際使用的模型。</span>
+      <span class="en">NTPU AI is a conversational AI service provided by National Taipei University. The interface is a single input box: you type a question, a small model first rates its difficulty, the system picks an answering model of the matching tier, and the reply is streamed back with the model it used shown on the message.</span>
+    </p>
+    <p>
+      <span class="zh">這份說明分成兩部分。一般版寫給使用這個服務的人；技術版說明一次請求怎麼被處理、資料存在哪裡。</span>
+      <span class="en">These notes come in two parts. The general section is for people using the service; the technical section describes how a request is handled and where data is kept.</span>
+    </p>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="wrap tabs" role="tablist">
+    <button class="tab" id="tab-general" type="button" role="tab" aria-selected="true"><span class="zh">一般版</span><span class="en">General</span></button>
+    <button class="tab" id="tab-tech" type="button" role="tab" aria-selected="false"><span class="zh">技術版</span><span class="en">Technical</span></button>
+    <nav class="secnav v-general">
+      <a href="#what"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a href="#howto"><span class="zh">怎麼用</span><span class="en">How</span></a>
+      <a href="#account"><span class="zh">帳號</span><span class="en">Accounts</span></a>
+      <a href="#limits"><span class="zh">限制</span><span class="en">Limits</span></a>
+    </nav>
+    <nav class="secnav v-tech">
+      <a href="#flow"><span class="zh">流程</span><span class="en">Flow</span></a>
+      <a href="#routing"><span class="zh">路由</span><span class="en">Routing</span></a>
+      <a href="#context"><span class="zh">脈絡</span><span class="en">Context</span></a>
+      <a href="#security"><span class="zh">資料</span><span class="en">Data</span></a>
+      <a href="#stack"><span class="zh">元件</span><span class="en">Components</span></a>
+    </nav>
+  </div>
+</div>
+
+<!-- ===================== 一般版 ===================== -->
+
+<section class="v-general" id="what">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">1</span><span class="zh">可以拿它做什麼</span><span class="en">What you can do with it</span></h2></div>
+    <ul class="plain">
+      <li><b><span class="zh">一般問答與寫作</span><span class="en">Questions and writing</span></b>：<span class="zh">解釋概念、整理重點、修改文句、翻譯、寫程式或除錯。回覆預設使用繁體中文；你用其他語言提問時，它會改用該語言回答。</span><span class="en">explanations, summaries, editing, translation, code and debugging. Replies default to Traditional Chinese and switch when you write in another language.</span></li>
+      <li><b><span class="zh">附檔案問內容</span><span class="en">Ask about a file</span></b>：<span class="zh">上傳 Word、PowerPoint、Excel、PDF、純文字或圖片後再提問，AI 會依檔案內容回答。單檔上限 20 MB。</span><span class="en">upload a Word, PowerPoint, Excel, PDF, plain-text or image file and ask about it. 20 MB per file.</span></li>
+      <li><b><span class="zh">引用某段話追問</span><span class="en">Quote and follow up</span></b>：<span class="zh">在回答中選取一段文字，可以只針對那一段繼續問。</span><span class="en">select part of an answer and ask a follow-up about just that passage.</span></li>
+      <li><b><span class="zh">語音輸入</span><span class="en">Voice input</span></b>：<span class="zh">用麥克風錄音轉成文字再送出，需要登入才能使用。</span><span class="en">record with the microphone and send the transcript. Requires sign-in.</span></li>
+      <li><b><span class="zh">對回答給回饋</span><span class="en">Rate an answer</span></b>：<span class="zh">每則回答下方都有讚與倒讚。按倒讚可以勾選問題類型（資訊錯誤、過時、答非所問、太籠統、找不到出處、其他）並補充說明，這些回饋會提供給管理者檢視。</span><span class="en">every answer has a thumbs-up and thumbs-down. Thumbs-down opens a short form for the problem type (incorrect, out of date, off topic, too vague, no source, other) and an optional comment, which administrators can review.</span></li>
+      <li><b><span class="zh">保存與分享對話</span><span class="en">Keep and share conversations</span></b>：<span class="zh">登入後對話會留在側欄，也可以產生唯讀連結分享出去。</span><span class="en">signed-in conversations stay in the sidebar and can be turned into a read-only share link.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="v-general tint" id="howto">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">2</span><span class="zh">怎麼用</span><span class="en">How to use it</span></h2></div>
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3><span class="zh">把問題寫清楚</span><span class="en">Write the question plainly</span></h3>
+          <p><span class="zh">不需要指定模型或開什麼功能。把背景、想要的格式與限制寫進去，結果會比較接近需求。</span><span class="en">You don't pick a model or switch anything on. Including context, the format you want and any constraints gets you closer to a usable answer.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">需要看資料就附檔案</span><span class="en">Attach a file when it needs to read something</span></h3>
+          <p><span class="zh">文件會在伺服器端取出文字後一起送給模型；圖片與 PDF 則直接讓模型看。</span><span class="en">Documents have their text extracted on the server and sent with your message; images and PDFs are passed to the model directly.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">等待串流回答</span><span class="en">Read the streamed answer</span></h3>
+          <p><span class="zh">內容邊產生邊顯示，長答案不必等全部完成。訊息上會標示這次使用的模型。</span><span class="en">Text appears as it is generated, so long answers are readable immediately. The model used is shown on the message.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">不滿意就補充條件再問</span><span class="en">Refine and ask again</span></h3>
+          <p><span class="zh">同一個對話會帶入前面的內容，可以逐步修正，不必每次重講背景。</span><span class="en">Earlier turns are carried within the same conversation, so you can refine step by step instead of restating everything.</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="v-general" id="account">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">3</span><span class="zh">訪客與登入的差別</span><span class="en">Guest vs. signed in</span></h2>
+    <p class="lead"><span class="zh">登入採用寄到信箱的一次性連結，只接受學校信箱（gm、ms、mail.ntpu.edu.tw），連結 15 分鐘內有效。</span><span class="en">Sign-in uses a one-time link sent to your mailbox. Only university addresses (gm, ms, mail.ntpu.edu.tw) are accepted, and the link is valid for 15 minutes.</span></p></div>
+    <div class="tablewrap"><table>
+      <thead>
+        <tr>
+          <th></th>
+          <th><span class="zh">訪客</span><span class="en">Guest</span></th>
+          <th><span class="zh">登入</span><span class="en">Signed in</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th><span class="zh">聊天與上傳檔案</span><span class="en">Chat and uploads</span></th>
+          <td><span class="zh">可以</span><span class="en">Yes</span></td>
+          <td><span class="zh">可以</span><span class="en">Yes</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">對話保存</span><span class="en">Conversation history</span></th>
+          <td><span class="zh">只留在這個瀏覽器，關掉就沒了</span><span class="en">Kept in this browser only; closing it loses the conversation</span></td>
+          <td><span class="zh">保存在伺服器，換裝置也看得到</span><span class="en">Stored on the server and available on other devices</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">語音輸入</span><span class="en">Voice input</span></th>
+          <td><span class="zh">不提供</span><span class="en">Not available</span></td>
+          <td><span class="zh">可以</span><span class="en">Yes</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">分享連結</span><span class="en">Share links</span></th>
+          <td><span class="zh">不提供</span><span class="en">Not available</span></td>
+          <td><span class="zh">可以</span><span class="en">Yes</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">長期記憶與自訂指示</span><span class="en">Memory and custom instructions</span></th>
+          <td><span class="zh">不提供</span><span class="en">Not available</span></td>
+          <td><span class="zh">可以，並可在設定中檢視或清除</span><span class="en">Available, and can be reviewed or cleared in settings</span></td>
+        </tr>
+      </tbody>
+    </table></div>
+    <p class="note"><span class="zh">長期記憶是一份不超過 2000 字的摘要，記錄你的身份、常見需求與偏好的回答方式，讓之後的對話不用重講。它由系統定期整理，內容隨時可以在設定裡查看與清空。</span><span class="en">Memory is a summary of at most 2,000 characters covering who you are, what you usually ask for and how you like answers written, so later conversations don't start from zero. It is refreshed periodically and can be inspected or wiped in settings at any time.</span></p>
+  </div>
+</section>
+
+<section class="v-general tint" id="limits">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">4</span><span class="zh">限制與注意事項</span><span class="en">Limits and cautions</span></h2></div>
+    <ul class="plain">
+      <li><b><span class="zh">回答可能有錯</span><span class="en">Answers can be wrong</span></b>：<span class="zh">學業、行政、醫療、法律或財務相關內容，請再向權責單位或原始資料確認。</span><span class="en">for academic, administrative, medical, legal or financial matters, confirm with the responsible office or the original source.</span></li>
+      <li><b><span class="zh">預設不會上網</span><span class="en">No live browsing by default</span></b>：<span class="zh">未開啟搜尋時，模型只依既有知識與你提供的檔案回答，不會查詢最新資訊。</span><span class="en">without search enabled, answers come from the model's existing knowledge and the files you provide, not from live sources.</span></li>
+      <li><b><span class="zh">對話脈絡有長度限制</span><span class="en">Limited context</span></b>：<span class="zh">每次回答只帶入這個對話最近十輪，更早的內容需要重新提供。</span><span class="en">only the last ten turns of a conversation are carried into each answer; anything earlier needs to be restated.</span></li>
+      <li><b><span class="zh">不要輸入敏感個資</span><span class="en">Don't enter sensitive data</span></b>：<span class="zh">包含身分證字號、金融帳號、他人隱私與未公開的校務資料。</span><span class="en">including ID numbers, financial accounts, other people's private information and unpublished university records.</span></li>
+      <li><b><span class="zh">檔案與流量上限</span><span class="en">Size limits</span></b>：<span class="zh">附件單檔 20 MB，語音檔 25 MB；短時間內重複上傳會被暫時擋下。</span><span class="en">20 MB per attachment and 25 MB per audio clip; repeated uploads in a short window are throttled.</span></li>
+      <li><b><span class="zh">作業與研究請自行查證</span><span class="en">Verify before you submit</span></b>：<span class="zh">使用時請遵守系所的學術誠信規範。</span><span class="en">follow your department's academic integrity rules when using it for coursework.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== 技術版 ===================== -->
+
+<section class="v-tech" id="flow">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">1</span><span class="zh">一次請求的處理流程</span><span class="en">Request flow</span></h2>
+    <p class="lead"><span class="zh">整個服務是一個 Cloudflare Worker，前端靜態檔案由同一個 Worker 的 assets 綁定提供。</span><span class="en">The service is a single Cloudflare Worker; the static frontend is served from the same Worker's assets binding.</span></p></div>
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3><span class="zh">前端送出</span><span class="en">Client request</span></h3>
+          <p><span class="zh">帶上登入權杖或 32 字元的隨機訪客 ID、Session ID、訊息文字，以及選用的引用段落與附件路徑。訪客會把自己的對話歷史一併送上來，因為伺服器沒有存。</span><span class="en">Carries a sign-in token or a 32-character random guest ID, the session ID, the message, plus an optional quoted passage and attachment key. Guests also send their own history, since the server keeps none.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">邊界檢查</span><span class="en">Edge checks</span></h3>
+          <p><span class="zh">驗證權杖或訪客 ID 格式；附件必須位於呼叫者自己的路徑前綴下，否則回 403。上傳與語音轉錄另有每分鐘 10 次的限流。</span><span class="en">Validates the token or guest ID format; an attachment must sit under the caller's own key prefix or the request is rejected with 403. Uploads and transcription are rate-limited to 10 per minute.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">組裝上下文</span><span class="en">Context assembly</span></h3>
+          <p><span class="zh">系統提示、今天日期、長期記憶、自訂指示與附件內容都在 Worker 端組合，接著取這個對話最近十輪作為脈絡。</span><span class="en">System prompt, today's date, long-term memory, custom instructions and attachment content are assembled inside the Worker, then the last ten turns are appended as context.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">難度判定</span><span class="en">Difficulty judgement</span></h3>
+          <p><span class="zh">判官模型回傳一段 JSON，包含分數、級距、選定模型與一句理由；這些資訊會先以 <code>judge</code> 事件推給前端。</span><span class="en">The judge model returns JSON with a score, tier, chosen model and a one-line reason, pushed to the browser first as a <code>judge</code> event.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3><span class="zh">串流回答與寫入</span><span class="en">Streaming and persistence</span></h3>
+          <p><span class="zh">選定模型的輸出以 SSE 逐段送出（<code>token</code>），結束時送 <code>done</code>。之後才寫入用量紀錄，登入者的對話也在此時更新。</span><span class="en">The selected model's output is streamed as <code>token</code> events and closed with <code>done</code>. Usage rows are written afterwards, along with the conversation for signed-in users.</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="v-tech tint" id="routing">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">2</span><span class="zh">難度判定與模型選擇</span><span class="en">Routing</span></h2>
+    <p class="lead"><span class="zh">判官模型只負責輸出路由 JSON，不回答問題。它會讀最近十輪對話（每輪截斷）與可選模型清單，再給出 0–10 的分數。</span><span class="en">The judge only emits routing JSON and never answers the question. It reads the last ten turns (each truncated) plus the list of candidate models, and returns a score from 0 to 10.</span></p></div>
+    <div class="tablewrap"><table>
+      <thead>
+        <tr>
+          <th><span class="zh">分數</span><span class="en">Score</span></th>
+          <th><span class="zh">級距</span><span class="en">Tier</span></th>
+          <th><span class="zh">典型任務</span><span class="en">Typical tasks</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="mono">0 – 3</th>
+          <td class="mono">small</td>
+          <td><span class="zh">閒聊、問候、單一事實查詢、是非題</span><span class="en">Small talk, greetings, single-fact lookups, yes/no questions</span></td>
+        </tr>
+        <tr>
+          <th class="mono">4 – 6</th>
+          <td class="mono">medium</td>
+          <td><span class="zh">概念解釋、摘要、基本程式碼、一般建議</span><span class="en">Explanations, summaries, basic code, general advice</span></td>
+        </tr>
+        <tr>
+          <th class="mono">7 – 10</th>
+          <td class="mono">large</td>
+          <td><span class="zh">多步推理、複雜實作、數學證明、跨領域整合</span><span class="en">Multi-step reasoning, complex implementation, proofs, cross-domain synthesis</span></td>
+        </tr>
+      </tbody>
+    </table></div>
+    <div class="items">
+      <div class="item">
+        <h3><span class="zh">候選池</span><span class="en">Candidate pools</span></h3>
+        <p><span class="zh">每個級距各有一個 Claude 與一個 Gemini 候選。判官依附帶的模型說明擇一；若它回傳的名稱不在該級距內，就退回該級距的第一個候選。</span><span class="en">Each tier holds one Claude and one Gemini candidate. The judge picks by the model notes it is given; if it returns a name outside the tier, the tier's first candidate is used.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">門檻設定</span><span class="en">Thresholds</span></h3>
+        <p><span class="zh">預設 medium 為 4 分、large 為 7 分，存在設定資料表中，可由管理端調整；管理員另可強制指定級距或單一模型。</span><span class="en">Defaults are 4 for medium and 7 for large, stored in a config table and adjustable from the admin panel. Admins can also force a tier or a specific model.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">判官失敗時</span><span class="en">Judge failures</span></h3>
+        <p><span class="zh">若判官逾時或回傳無法解析的內容，會以 5 分作為安全預設繼續處理，不中斷這次請求。</span><span class="en">If the judge times out or returns unparseable output, the request continues with a default score of 5 rather than failing.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">記錄</span><span class="en">What is recorded</span></h3>
+        <p><span class="zh">分數、級距、選定模型、判官耗時與判官本身的 token 用量都會寫入用量紀錄，可在管理端依級距檢視分布。</span><span class="en">Score, tier, chosen model, judge latency and the judge's own token usage are written to the usage log and can be reviewed per tier.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="v-tech" id="context">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">3</span><span class="zh">對話、記憶與附件</span><span class="en">Conversations, memory and files</span></h2></div>
+    <div class="items">
+      <div class="item">
+        <h3><span class="zh">脈絡長度</span><span class="en">Context window</span></h3>
+        <p><span class="zh">送進模型的只有最近十輪；判官讀到的同樣是這十輪，且每輪內容另外截斷以控制成本。</span><span class="en">Only the last ten turns are sent to the answering model. The judge sees the same ten, each further truncated to keep its cost down.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">歷史存放</span><span class="en">Where history lives</span></h3>
+        <p><span class="zh">登入者的對話存在資料庫，含標題、題數與更新時間；訪客的對話不落地，由瀏覽器在每次請求中一併送出。</span><span class="en">Signed-in conversations live in the database with a title, question count and timestamps. Guest conversations are never stored; the browser sends them with each request.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">長期記憶</span><span class="en">Long-term memory</span></h3>
+        <p><span class="zh">對話首次更新時會標記待整理，滿三小時後的下一次發問，由另一個較小的模型把既有摘要與最近對話合併成不超過 2000 字的新摘要，衝突時以新的為準。使用者可隨時查看或清除。</span><span class="en">A conversation is flagged for consolidation on its first update. Three hours later, on the next message, a separate smaller model merges the existing summary with recent turns into a new one of at most 2,000 characters, newer facts winning. Users can view or clear it at any time.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">自訂指示</span><span class="en">Custom instructions</span></h3>
+        <p><span class="zh">登入者可設定一段長期指示，附加在系統提示之後，一起送進每次請求。</span><span class="en">Signed-in users can set a standing instruction, appended after the system prompt on every request.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">檔案解析</span><span class="en">File handling</span></h3>
+        <p><span class="zh">純文字與 JSON、XML 類型直接取用內容並截斷；Word、PowerPoint、Excel 在 Worker 內解壓縮抽出文字；圖片、PDF、音訊與影片以 base64 內嵌給模型。無法解析的格式會回覆提示改用支援的類型。</span><span class="en">Plain text, JSON and XML are read and truncated; Word, PowerPoint and Excel files are unzipped and text-extracted inside the Worker; images, PDFs, audio and video are inlined as base64. Unsupported types return a message asking for a supported format.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">附件隔離</span><span class="en">Attachment isolation</span></h3>
+        <p><span class="zh">檔案存到物件儲存時依擁有者分路徑，登入者與訪客各有自己的前綴；讀取與預覽都會檢查前綴是否相符。</span><span class="en">Uploads are keyed by owner, with separate prefixes for signed-in users and guests; both reads and previews check that the prefix matches the caller.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="v-tech tint" id="security">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">4</span><span class="zh">身分、資料與統計</span><span class="en">Identity, data and metrics</span></h2></div>
+    <div class="items">
+      <div class="item">
+        <h3><span class="zh">登入方式</span><span class="en">Sign-in</span></h3>
+        <p><span class="zh">寄出一次性連結，資料庫只存該連結的雜湊值，15 分鐘後失效且用過即作廢。允許的網域是 gm、ms、mail.ntpu.edu.tw，另加設定中的管理員信箱。</span><span class="en">A one-time link is emailed; only its hash is stored. It expires after 15 minutes and is invalidated once used. Allowed domains are gm, ms and mail.ntpu.edu.tw, plus the configured admin address.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">後續驗證</span><span class="en">Session tokens</span></h3>
+        <p><span class="zh">驗證成功後簽發 HMAC-SHA256 權杖，之後每次請求都檢查簽章與有效期限。</span><span class="en">After verification the Worker issues an HMAC-SHA256 token; every later request has its signature and expiry checked.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">回應標頭</span><span class="en">Response headers</span></h3>
+        <p><span class="zh">所有回應統一加上 <code>X-Content-Type-Options</code>、<code>X-Frame-Options: DENY</code>、<code>Referrer-Policy</code> 與 <code>Permissions-Policy</code>。</span><span class="en">Every response carries <code>X-Content-Type-Options</code>, <code>X-Frame-Options: DENY</code>, <code>Referrer-Policy</code> and <code>Permissions-Policy</code>.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">金鑰</span><span class="en">Secrets</span></h3>
+        <p><span class="zh">模型服務與信箱服務的金鑰都是 Worker 端的環境變數，不會出現在前端程式或回應中。</span><span class="en">Model and mail credentials are Worker-side environment variables and never appear in frontend code or responses.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">用量紀錄</span><span class="en">Usage log</span></h3>
+        <p><span class="zh">每次回答寫一筆：使用者或訪客識別、Session ID、身分類型、模型、級距、分數與 token 數，不包含問題或回答的文字。</span><span class="en">One row per answer: user or guest identifier, session ID, access type, model, tier, score and token counts. No question or answer text is included.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">回答層級回饋</span><span class="en">Answer-level feedback</span></h3>
+        <p><span class="zh">讚／倒讚以「Session ID ＋ 回答序號」為鍵，同一則回答只會保留最新一次；倒讚另存勾選的原因代碼與最多 1000 字的補充說明。這是唯一會保存使用者輸入文字的統計資料。</span><span class="en">Votes are keyed by session ID plus the answer's position, so re-voting replaces the previous one. A thumbs-down also stores the selected reason codes and an optional comment of up to 1,000 characters — the only free text kept for reporting.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">滿意度調查</span><span class="en">Satisfaction survey</span></h3>
+        <p><span class="zh">同一個 Session 累積三題後才會出現一次評分邀請，未達標的送出會被拒絕；每個 Session 只計一筆。</span><span class="en">A rating prompt appears once a session reaches three questions; submissions below that are rejected, and each session counts once.</span></p>
+      </div>
+      <div class="item">
+        <h3><span class="zh">儲存位置</span><span class="en">Storage</span></h3>
+        <p><span class="zh">帳號、對話、設定、用量、問卷、回答回饋、分享與限流紀錄都放在 Cloudflare D1；附件放在 R2。</span><span class="en">Accounts, conversations, profiles, usage, survey results, answer feedback, shares and rate-limit counters are in Cloudflare D1; attachments are in R2.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="v-tech" id="stack">
+  <div class="wrap">
+    <div class="sechead"><h2><span class="num">5</span><span class="zh">元件一覽</span><span class="en">Components</span></h2></div>
+    <div class="tablewrap"><table>
+      <tbody>
+        <tr>
+          <th><span class="zh">執行環境</span><span class="en">Runtime</span></th>
+          <td><span class="zh">Cloudflare Workers，前端靜態檔案由 assets 綁定提供</span><span class="en">Cloudflare Workers, with the static frontend served from the assets binding</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">前端</span><span class="en">Frontend</span></th>
+          <td><span class="zh">單一 HTML 檔、原生 JavaScript、SSE 串流渲染、中英雙語</span><span class="en">A single HTML file, vanilla JavaScript, SSE rendering, Chinese and English</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">模型呼叫</span><span class="en">Model access</span></th>
+          <td><span class="zh">透過 OpenRouter 呼叫 Claude 與 Gemini 系列；判官與記憶整理各自使用較小的模型</span><span class="en">Claude and Gemini models through OpenRouter; the judge and the memory step each use a smaller model</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">語音轉文字</span><span class="en">Transcription</span></th>
+          <td><span class="zh">Whisper，僅登入者可用，音檔上限 25 MB</span><span class="en">Whisper, signed-in users only, 25 MB per clip</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">資料庫</span><span class="en">Database</span></th>
+          <td><span class="zh">Cloudflare D1（SQLite）</span><span class="en">Cloudflare D1 (SQLite)</span></td>
+        </tr>
+        <tr>
+          <th><span class="zh">物件儲存</span><span class="en">Object storage</span></th>
+          <td>Cloudflare R2</td>
+        </tr>
+        <tr>
+          <th><span class="zh">寄信</span><span class="en">Email</span></th>
+          <td><span class="zh">Cloudflare Email，用於寄送登入連結</span><span class="en">Cloudflare Email, used for sign-in links</span></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="flinks">
+      <a href="/"><span class="zh">回到 NTPU AI</span><span class="en">Back to NTPU AI</span></a>
+    </div>
+    <div class="credit">
+      <span class="who">
+        <span class="zh">國立臺北大學 NTPU AI，由 AI4X 研發團隊開發與維護。</span>
+        <span class="en">NTPU AI, National Taipei University. Developed and maintained by the AI4X R&amp;D team.</span>
+      </span>
+      <a class="teamlink" href="https://ai4x.ntpu.edu.tw/zh/members.html#rd-team" target="_blank" rel="noopener"><span class="zh">認識 AI4X 研發團隊</span><span class="en">Meet the AI4X team</span><span class="arw">↗</span></a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var stored = null;
+    try { stored = localStorage.getItem("lang"); } catch (e) {}
+    var lang = stored === "en" ? "en" : "zh";
+    applyLang(lang);
+
+    document.getElementById("langbtn").addEventListener("click", function () {
+      lang = lang === "en" ? "zh" : "en";
+      applyLang(lang);
+      try { localStorage.setItem("lang", lang); } catch (e) {}
+    });
+
+    function applyLang(value) {
+      document.body.classList.toggle("lang-en", value === "en");
+      document.documentElement.lang = value === "en" ? "en" : "zh-Hant";
+    }
+
+    var TECH_IDS = ["flow", "routing", "context", "security", "stack"];
+    var tabG = document.getElementById("tab-general");
+    var tabT = document.getElementById("tab-tech");
+
+    function setView(view, push) {
+      var tech = view === "tech";
+      document.body.classList.toggle("view-tech", tech);
+      tabG.setAttribute("aria-selected", String(!tech));
+      tabT.setAttribute("aria-selected", String(tech));
+      if (push) history.replaceState(null, "", tech ? "#tech" : location.pathname);
+    }
+
+    tabG.addEventListener("click", function () { setView("general", true); window.scrollTo({ top: 0 }); });
+    tabT.addEventListener("click", function () { setView("tech", true); window.scrollTo({ top: 0 }); });
+
+    var hash = location.hash.replace("#", "");
+    setView(hash === "tech" || TECH_IDS.indexOf(hash) >= 0 ? "tech" : "general", false);
+    if (TECH_IDS.indexOf(hash) >= 0) document.getElementById(hash).scrollIntoView();
+  })();
+</script>
+
+</body>
+</html>
