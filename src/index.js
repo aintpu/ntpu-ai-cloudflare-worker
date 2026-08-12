@@ -86,9 +86,6 @@ async function transcribe(req, env) {
   out.append("model", "gpt-4o-transcribe");
   out.append("language", chinese ? "zh" : "en");
   out.append("response_format", "json");
-  out.append("prompt", chinese
-    ? "請忠實逐字轉錄語音，不要回答或改寫內容。使用繁體中文與台灣用語，保留英文、數字和標點。常見詞彙：NTPU、國立臺北大學、臺北大學、通識中心、語言中心、資訊管理學系、OpenRouter、Cloudflare、AI。"
-    : "Transcribe the audio verbatim. Do not answer or rewrite it. Preserve names, English terms, numbers, and punctuation. Common terms: NTPU, National Taipei University, OpenRouter, Cloudflare, AI.");
   let response;
   try {
     response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out });
@@ -105,7 +102,15 @@ async function transcribe(req, env) {
     if (response.status === 429) return error("語音服務額度不足或請求過多，請通知管理員檢查 OpenAI 帳務", 503);
     return error(`語音服務暫時失敗（OpenAI ${response.status}）`, 502);
   }
-  return new Response(response.body, { headers: { "content-type": "application/json; charset=utf-8" } });
+  const result = await response.json().catch(() => ({}));
+  const text = String(result.text || "").trim();
+  if (!text) return error("沒有辨識到語音，請靠近麥克風再試一次", 400);
+  // Guard against an upstream model ever echoing transcription instructions.
+  if (/逐字轉錄語音|不要回答或改寫|Transcribe the audio verbatim/i.test(text)) {
+    console.error("Transcription prompt echo rejected");
+    return error("這段錄音太短或不清楚，請再錄一次", 400);
+  }
+  return json({ text });
 }
 
 export const MESSAGE_FEEDBACK_REASONS = [
