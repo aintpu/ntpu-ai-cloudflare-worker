@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import worker, { adminStats } from "../src/index.js";
+import worker, { adminStats, hasUnsupportedTranscriptionScript, normalizeTranscription } from "../src/index.js";
 import { extractOfficeText } from "../src/office.js";
 import { routeFromScore } from "../src/routing.js";
 import { MODEL_PROVIDER_IDS } from "../src/models.js";
@@ -160,8 +160,16 @@ test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async 
   assert.match(index, /gpt-4o-transcribe/);
   assert.doesNotMatch(index, /out\.append\("prompt"/);
   assert.match(index, /Transcription prompt echo rejected/);
-  assert.match(index, /Chinese transcription script mismatch/);
+  assert.match(index, /non-Chinese\/non-English script/);
   assert.match(index, /requestTranscription\("whisper-1"\)/);
   assert.match(html, /echoCancellation: true/);
   assert.match(html, /noiseSuppression: true/);
+});
+
+test("語音結果只保留繁體中文與英文", () => {
+  assert.equal(normalizeTranscription("测试软件信息 and Cloudflare"), "測試軟體資訊 and Cloudflare");
+  assert.equal(hasUnsupportedTranscriptionScript("測試 test 123"), false);
+  assert.equal(hasUnsupportedTranscriptionScript("अधिकाँ"), true);
+  assert.equal(hasUnsupportedTranscriptionScript("テスト"), true);
+  assert.equal(hasUnsupportedTranscriptionScript("테스트"), true);
 });

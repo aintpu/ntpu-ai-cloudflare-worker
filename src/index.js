@@ -3,9 +3,17 @@ import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
 import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE, OPENROUTER_PRICING, providerModel } from "./models.js";
 import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders } from "./utils.js";
+import { Converter } from "opencc-js";
 
 const owner = async (req, env) => authenticate(req, env);
 const pathMatch = (path, re) => path.match(re);
+const toTaiwanTraditional = Converter({ from: "cn", to: "twp" });
+
+export const hasUnsupportedTranscriptionScript = value => [...String(value || "")].some(char =>
+  /\p{L}/u.test(char) && !/[\p{Script=Han}\p{Script=Latin}]/u.test(char)
+);
+
+export const normalizeTranscription = value => toTaiwanTraditional(String(value || "").normalize("NFC").trim());
 
 async function enforceRateLimit(env, key, limit, windowSeconds = 60) {
   const windowStart = Math.floor(Date.now() / 1000 / windowSeconds) * windowSeconds;
@@ -114,20 +122,19 @@ async function transcribe(req, env) {
     console.error("Transcription prompt echo rejected");
     return error("這段錄音太短或不清楚，請再錄一次", 400);
   }
-  const incompatibleWithChinese = value => /[\p{Script=Devanagari}\p{Script=Arabic}\p{Script=Bengali}\p{Script=Cyrillic}\p{Script=Thai}\p{Script=Hebrew}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(value);
-  if (chinese && incompatibleWithChinese(text)) {
-    console.warn("Chinese transcription script mismatch; retrying with whisper-1");
+  if (hasUnsupportedTranscriptionScript(text)) {
+    console.warn("Transcription contains a non-Chinese/non-English script; retrying with whisper-1");
     try {
       const fallback = await requestTranscription("whisper-1");
       const fallbackText = String(fallback.result.text || "").trim();
-      if (fallback.response.ok && fallbackText && !incompatibleWithChinese(fallbackText)) text = fallbackText;
-      else return error("語音語系辨識錯誤，請靠近麥克風並說慢一點後重試", 400);
+      if (fallback.response.ok && fallbackText && !hasUnsupportedTranscriptionScript(fallbackText)) text = fallbackText;
+      else return error("語音輸入僅支援繁體中文與英文，請靠近麥克風並說慢一點後重試", 400);
     } catch (cause) {
       console.error("Fallback transcription failed", cause);
-      return error("語音語系辨識錯誤，請再錄一次", 400);
+      return error("語音輸入僅支援繁體中文與英文，請再錄一次", 400);
     }
   }
-  return json({ text });
+  return json({ text: normalizeTranscription(text) });
 }
 
 export const MESSAGE_FEEDBACK_REASONS = [
