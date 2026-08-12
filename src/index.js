@@ -81,20 +81,25 @@ async function transcribe(req, env) {
   if (!env.OPENAI_API_KEY) return error("語音服務尚未設定 OPENAI_API_KEY", 503);
   const form = await req.formData(); const file = form.get("file"); if (!(file instanceof File)) return error("缺少音檔", 400); if (file.size > 25 * 1024 * 1024) return error("音檔過大（上限 25 MB）", 413);
   const chinese = String(form.get("lang") || "zh").startsWith("zh");
-  const out = new FormData();
-  out.append("file", file, file.name || "audio.webm");
-  out.append("model", "gpt-4o-transcribe");
-  out.append("language", chinese ? "zh" : "en");
-  out.append("response_format", "json");
-  let response;
+  const requestTranscription = async model => {
+    const out = new FormData();
+    out.append("file", file, file.name || "audio.webm");
+    out.append("model", model);
+    out.append("language", chinese ? "zh" : "en");
+    out.append("response_format", "json");
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out });
+    return { response, result: await response.json().catch(() => ({})) };
+  };
+  let attempt;
   try {
-    response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out });
+    attempt = await requestTranscription("gpt-4o-transcribe");
   } catch (cause) {
     console.error("OpenAI transcription network error", cause);
     return error("目前無法連線至語音服務，請稍後再試", 502);
   }
+  const { response } = attempt;
   if (!response.ok) {
-    const upstream = await response.json().catch(() => ({}));
+    const upstream = attempt.result;
     const code = upstream?.error?.code || upstream?.error?.type || "unknown";
     console.error("OpenAI transcription failed", response.status, code);
     if (response.status === 400) return error("無法辨識這段錄音，請錄製至少 1 秒並再試一次", 400);
@@ -102,13 +107,25 @@ async function transcribe(req, env) {
     if (response.status === 429) return error("語音服務額度不足或請求過多，請通知管理員檢查 OpenAI 帳務", 503);
     return error(`語音服務暫時失敗（OpenAI ${response.status}）`, 502);
   }
-  const result = await response.json().catch(() => ({}));
-  const text = String(result.text || "").trim();
+  let text = String(attempt.result.text || "").trim();
   if (!text) return error("沒有辨識到語音，請靠近麥克風再試一次", 400);
   // Guard against an upstream model ever echoing transcription instructions.
   if (/逐字轉錄語音|不要回答或改寫|Transcribe the audio verbatim/i.test(text)) {
     console.error("Transcription prompt echo rejected");
     return error("這段錄音太短或不清楚，請再錄一次", 400);
+  }
+  const incompatibleWithChinese = value => /[\p{Script=Devanagari}\p{Script=Arabic}\p{Script=Bengali}\p{Script=Cyrillic}\p{Script=Thai}\p{Script=Hebrew}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(value);
+  if (chinese && incompatibleWithChinese(text)) {
+    console.warn("Chinese transcription script mismatch; retrying with whisper-1");
+    try {
+      const fallback = await requestTranscription("whisper-1");
+      const fallbackText = String(fallback.result.text || "").trim();
+      if (fallback.response.ok && fallbackText && !incompatibleWithChinese(fallbackText)) text = fallbackText;
+      else return error("語音語系辨識錯誤，請靠近麥克風並說慢一點後重試", 400);
+    } catch (cause) {
+      console.error("Fallback transcription failed", cause);
+      return error("語音語系辨識錯誤，請再錄一次", 400);
+    }
   }
   return json({ text });
 }

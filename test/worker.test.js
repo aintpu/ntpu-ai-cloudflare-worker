@@ -160,6 +160,8 @@ test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async 
   assert.match(index, /gpt-4o-transcribe/);
   assert.doesNotMatch(index, /out\.append\("prompt"/);
   assert.match(index, /Transcription prompt echo rejected/);
+  assert.match(index, /Chinese transcription script mismatch/);
+  assert.match(index, /requestTranscription\("whisper-1"\)/);
   assert.match(html, /echoCancellation: true/);
   assert.match(html, /noiseSuppression: true/);
 });
