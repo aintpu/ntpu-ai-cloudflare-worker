@@ -146,7 +146,7 @@ test("Cloudflare 可直接擷取 DOCX 文字供預覽與模型使用", () => {
   assert.equal(extractOfficeText(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "國立臺北大學");
 });
 
-test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async () => {
+test("語音輸入使用 Cloudflare Workers AI 並支援多種錄音格式", async () => {
   const [html, index] = await Promise.all([
     readFile("public/index.html", "utf8"),
     readFile("src/index.js", "utf8"),
@@ -155,13 +155,13 @@ test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async 
   assert.match(html, /audio\/mp4/);
   assert.match(html, /micTooShort/);
   assert.match(html, /micLoginExpired/);
-  assert.match(index, /語音服務金鑰無效/);
-  assert.match(index, /語音服務額度不足/);
-  assert.match(index, /gpt-4o-transcribe/);
-  assert.doesNotMatch(index, /out\.append\("prompt"/);
+  assert.match(index, /@cf\/openai\/whisper-large-v3-turbo/);
+  assert.match(index, /condition_on_previous_text: false/);
+  assert.match(index, /vad_filter: true/);
+  assert.doesNotMatch(index, /api\.openai\.com\/v1\/audio\/transcriptions/);
   assert.match(index, /Transcription prompt echo rejected/);
   assert.match(index, /non-Chinese\/non-English script/);
-  assert.match(index, /requestTranscription\("whisper-1"\)/);
+  assert.doesNotMatch(index, /OPENAI_API_KEY/);
   assert.match(html, /echoCancellation: true/);
   assert.match(html, /noiseSuppression: true/);
 });

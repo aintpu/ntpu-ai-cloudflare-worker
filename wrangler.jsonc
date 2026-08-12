@@ -18,6 +18,9 @@
     "html_handling": "none",
     "not_found_handling": "single-page-application"
   },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "ADMIN_EMAIL": "aintpu@gmail.com",
     "EMAIL_FROM": "noreply@ntpu.ai"
