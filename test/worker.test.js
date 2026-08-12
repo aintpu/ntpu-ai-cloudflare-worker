@@ -164,6 +164,9 @@ test("語音輸入使用 Cloudflare Workers AI 並支援多種錄音格式", asy
   assert.doesNotMatch(index, /OPENAI_API_KEY/);
   assert.match(html, /echoCancellation: true/);
   assert.match(html, /noiseSuppression: true/);
+  assert.match(html, /window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/);
+  assert.match(html, /recognition\.lang = _lang === "zh" \? "zh-TW" : "en-US"/);
+  assert.match(html, /if \(_startBrowserSpeechRecognition\(\)\) return/);
 });
 
 test("語音結果只保留繁體中文與英文", () => {

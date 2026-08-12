@@ -2327,19 +2327,67 @@
     if (card) openFilePreview(card.dataset.gcs, card.dataset.fname, card.dataset.mime);
   });
 
-  // ── Voice input (Whisper) ──
+  // ── Voice input: Chrome SpeechRecognition first; Workers AI fallback ──
   let _mediaRecorder = null;
+  let _speechRecognition = null;
   let _audioChunks   = [];
   let _isRecording   = false;
   let _recordingStartedAt = 0;
 
   const micBtn = document.getElementById("micBtn");
 
+  function _resetMicButton() {
+    _isRecording = false;
+    micBtn.classList.remove("recording");
+    micBtn.title = t("micTitle");
+    micBtn.innerHTML = ICONS.mic;
+    micBtn.disabled = false;
+  }
+
+  function _startBrowserSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return false;
+    const recognition = new SpeechRecognition();
+    _speechRecognition = recognition;
+    recognition.lang = _lang === "zh" ? "zh-TW" : "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      _isRecording = true;
+      micBtn.classList.add("recording");
+      micBtn.title = t("micStop");
+    };
+    recognition.onresult = event => {
+      const transcript = String(event.results?.[0]?.[0]?.transcript || "").trim();
+      if (transcript) {
+        ta.value = (ta.value ? ta.value + " " : "") + transcript;
+        ta.dispatchEvent(new Event("input"));
+        ta.focus();
+      } else alert(t("micError"));
+    };
+    recognition.onerror = event => {
+      if (event.error === "aborted") return;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") alert(t("micPermission"));
+      else if (event.error === "no-speech") alert(t("micNoSpeech"));
+      else alert(`${t("micError")}（${event.error || "unknown"}）`);
+    };
+    recognition.onend = () => {
+      _speechRecognition = null;
+      _resetMicButton();
+    };
+    try { recognition.start(); return true; }
+    catch (error) { console.error("SpeechRecognition start failed", error); _speechRecognition = null; return false; }
+  }
+
   micBtn.onclick = async () => {
     if (_isRecording) {
-      _mediaRecorder?.stop();
+      if (_speechRecognition) _speechRecognition.stop();
+      else _mediaRecorder?.stop();
       return;
     }
+    // Chrome's dictation service is substantially better for short phrases such as「測試測試」.
+    if (_startBrowserSpeechRecognition()) return;
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         alert(t("micError"));
@@ -2359,9 +2407,7 @@
       };
       _mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        _isRecording = false;
-        micBtn.classList.remove("recording");
-        micBtn.title = t("micTitle");
+        _resetMicButton();
         const recordedType = _mediaRecorder?.mimeType || mimeType || "audio/webm";
         const blob = new Blob(_audioChunks, { type: recordedType });
         if (Date.now() - _recordingStartedAt < 1000 || blob.size < 1000) {
@@ -2749,6 +2795,7 @@
       micTimeout:       "語音辨識逾時，請再試一次",
       micTooShort:      "錄音時間太短，請至少說話 1 秒後再停止",
       micLoginExpired:  "登入狀態已失效，請重新登入後再使用語音輸入",
+      micNoSpeech:      "沒有聽到語音，請靠近麥克風再試一次",
       deleteConv:       "刪除",
       deleteConvConfirm:"確定要刪除此對話？刪除後無法復原。",
       historyLimitBar:  "↑ 以上訊息已超出 AI 記憶範圍（最多記 10 輪對話）",
@@ -2986,6 +3033,7 @@
       micTimeout:       "Speech recognition timed out. Please try again.",
       micTooShort:      "The recording was too short. Speak for at least one second before stopping.",
       micLoginExpired:  "Your sign-in has expired. Sign in again to use voice input.",
+      micNoSpeech:      "No speech was detected. Move closer to the microphone and try again.",
       deleteConv:       "Delete",
       deleteConvConfirm:"Delete this conversation? This cannot be undone.",
       historyLimitBar:  "↑ Earlier messages are outside AI memory (last 10 turns)",
