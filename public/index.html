@@ -2299,6 +2299,7 @@
   let _mediaRecorder = null;
   let _audioChunks   = [];
   let _isRecording   = false;
+  let _recordingStartedAt = 0;
 
   const micBtn = document.getElementById("micBtn");
 
@@ -2308,19 +2309,31 @@
       return;
     }
     try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        alert(t("micError"));
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus" : "audio/webm";
-      _mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]
+        .find(type => MediaRecorder.isTypeSupported(type)) || "";
+      _mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       _audioChunks = [];
       _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
+      _mediaRecorder.onerror = event => {
+        console.error("MediaRecorder error", event.error || event);
+        alert(t("micError"));
+      };
       _mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         _isRecording = false;
         micBtn.classList.remove("recording");
         micBtn.title = t("micTitle");
-        const blob = new Blob(_audioChunks, { type: mimeType });
-        if (blob.size < 1000) return; // too short, ignore
+        const recordedType = _mediaRecorder?.mimeType || mimeType || "audio/webm";
+        const blob = new Blob(_audioChunks, { type: recordedType });
+        if (Date.now() - _recordingStartedAt < 1000 || blob.size < 1000) {
+          alert(t("micTooShort"));
+          return;
+        }
         micBtn.innerHTML = '<span class="spinner"></span>';
         micBtn.disabled = true;
         const _txTimeout = setTimeout(() => {
@@ -2329,23 +2342,28 @@
         try {
           const token = await currentUser.getIdToken();
           const fd = new FormData();
-          fd.append("file", blob, "audio.webm");
+          const extension = recordedType.includes("mp4") ? "m4a" : recordedType.includes("ogg") ? "ogg" : "webm";
+          fd.append("file", blob, `audio.${extension}`);
           fd.append("lang", _lang);
           const res = await fetch(`${BASE_URL}/transcribe`, {
             method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: fd,
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (res.ok && data.text) {
             ta.value = (ta.value ? ta.value + " " : "") + data.text;
             ta.dispatchEvent(new Event("input"));
             ta.focus();
           } else {
-            alert(data.detail || t("micError"));
+            alert(res.status === 401 ? t("micLoginExpired") : (data.detail || `${t("micError")}（HTTP ${res.status}）`));
           }
-        } catch (_) { alert(t("micError")); }
+        } catch (error) {
+          console.error("Voice transcription failed", error);
+          alert(error?.message ? `${t("micError")}：${error.message}` : t("micError"));
+        }
         finally { clearTimeout(_txTimeout); micBtn.innerHTML = ICONS.mic; micBtn.disabled = false; }
       };
-      _mediaRecorder.start();
+      _mediaRecorder.start(250);
+      _recordingStartedAt = Date.now();
       _isRecording = true;
       micBtn.classList.add("recording");
       micBtn.title = t("micStop");
@@ -2695,6 +2713,8 @@
       micError:         "語音辨識失敗，請再試一次",
       micPermission:    "請允許麥克風權限後再試",
       micTimeout:       "語音辨識逾時，請再試一次",
+      micTooShort:      "錄音時間太短，請至少說話 1 秒後再停止",
+      micLoginExpired:  "登入狀態已失效，請重新登入後再使用語音輸入",
       deleteConv:       "刪除",
       deleteConvConfirm:"確定要刪除此對話？刪除後無法復原。",
       historyLimitBar:  "↑ 以上訊息已超出 AI 記憶範圍（最多記 10 輪對話）",
@@ -2930,6 +2950,8 @@
       micError:         "Speech recognition failed, please try again",
       micPermission:    "Please allow microphone access and try again",
       micTimeout:       "Speech recognition timed out. Please try again.",
+      micTooShort:      "The recording was too short. Speak for at least one second before stopping.",
+      micLoginExpired:  "Your sign-in has expired. Sign in again to use voice input.",
       deleteConv:       "Delete",
       deleteConvConfirm:"Delete this conversation? This cannot be undone.",
       historyLimitBar:  "↑ Earlier messages are outside AI memory (last 10 turns)",

@@ -78,9 +78,26 @@ async function preview(req, env, url) {
 
 async function transcribe(req, env) {
   const user = await owner(req, env); const limited = await enforceRateLimit(env, `upload:${user.uid}`, 10); if (limited) return limited;
+  if (!env.OPENAI_API_KEY) return error("語音服務尚未設定 OPENAI_API_KEY", 503);
   const form = await req.formData(); const file = form.get("file"); if (!(file instanceof File)) return error("缺少音檔", 400); if (file.size > 25 * 1024 * 1024) return error("音檔過大（上限 25 MB）", 413);
   const out = new FormData(); out.append("file", file, file.name || "audio.webm"); out.append("model", "whisper-1"); out.append("language", String(form.get("lang") || "zh").startsWith("zh") ? "zh" : "en");
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out }); if (!response.ok) return error("語音轉文字失敗", 502); return new Response(response.body, { headers: { "content-type": "application/json" } });
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: out });
+  } catch (cause) {
+    console.error("OpenAI transcription network error", cause);
+    return error("目前無法連線至語音服務，請稍後再試", 502);
+  }
+  if (!response.ok) {
+    const upstream = await response.json().catch(() => ({}));
+    const code = upstream?.error?.code || upstream?.error?.type || "unknown";
+    console.error("OpenAI transcription failed", response.status, code);
+    if (response.status === 400) return error("無法辨識這段錄音，請錄製至少 1 秒並再試一次", 400);
+    if (response.status === 401 || response.status === 403) return error("語音服務金鑰無效，請通知管理員更新 OPENAI_API_KEY", 502);
+    if (response.status === 429) return error("語音服務額度不足或請求過多，請通知管理員檢查 OpenAI 帳務", 503);
+    return error(`語音服務暫時失敗（OpenAI ${response.status}）`, 502);
+  }
+  return new Response(response.body, { headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
 export const MESSAGE_FEEDBACK_REASONS = [

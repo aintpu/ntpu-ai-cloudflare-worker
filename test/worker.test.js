@@ -145,3 +145,16 @@ test("Cloudflare 可直接擷取 DOCX 文字供預覽與模型使用", () => {
   const bytes = zipSync({ "word/document.xml": strToU8('<w:document><w:body><w:p><w:r><w:t>國立臺北大學</w:t></w:r></w:p></w:body></w:document>') });
   assert.equal(extractOfficeText(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "國立臺北大學");
 });
+
+test("語音輸入保留 OpenAI 錯誤類型並支援多種錄音格式", async () => {
+  const [html, index] = await Promise.all([
+    readFile("public/index.html", "utf8"),
+    readFile("src/index.js", "utf8"),
+  ]);
+  assert.match(html, /audio\/webm;codecs=opus/);
+  assert.match(html, /audio\/mp4/);
+  assert.match(html, /micTooShort/);
+  assert.match(html, /micLoginExpired/);
+  assert.match(index, /語音服務金鑰無效/);
+  assert.match(index, /語音服務額度不足/);
+});
