@@ -1247,6 +1247,7 @@
   // Cloudflare Worker 原生 Magic Link auth；token 只存於瀏覽器，不再使用 Firebase。
   const AUTH_TOKEN_KEY = "ntpu_ai_cf_auth_token";
   const AUTH_USER_KEY = "ntpu_ai_cf_auth_user";
+  const CONVERSATION_LIST_CACHE_PREFIX = "ntpu_ai_conversation_list:";
   const _authListeners = [];
   const _makeUser = (data, token) => ({
     uid: data.uid, email: data.email, displayName: "",
@@ -1438,6 +1439,11 @@
       document.getElementById("adminBtn").style.display = isAdmin ? "flex" : "none";
       applyGuestCapabilities();
 
+      // 先顯示上次成功同步的側欄，避免首次網路請求稍慢時看起來像沒有紀錄。
+      try {
+        const cached = JSON.parse(localStorage.getItem(CONVERSATION_LIST_CACHE_PREFIX + user.uid) || "[]");
+        if (Array.isArray(cached) && cached.length) renderConvList(cached);
+      } catch (_) {}
       await loadConversations();
 
       // 重新整理後自動恢復上次對話內容
@@ -1477,21 +1483,47 @@
   }
 
   // ── Conversation list ──
+  let _conversationLoadPromise = null;
   async function loadConversations() {
-    if (!currentUser) return;
-    try {
-      const token = await currentUser.getIdToken();
-      const res = await fetch(`${BASE_URL}/conversations`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const list = await res.json();
-      renderConvList(list);
-    } catch (_) {}
+    if (!currentUser || isGuestMode) return [];
+    if (_conversationLoadPromise) return _conversationLoadPromise;
+    const user = currentUser;
+    _conversationLoadPromise = (async () => {
+      let lastError;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 400));
+          const token = await user.getIdToken();
+          const res = await fetch(`${BASE_URL}/conversations`, {
+            headers: { "Authorization": `Bearer ${token}` },
+            cache: "no-store",
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const list = await res.json();
+          if (!Array.isArray(list)) throw new Error("Invalid conversation list");
+          if (currentUser !== user || isGuestMode) return list;
+          localStorage.setItem(CONVERSATION_LIST_CACHE_PREFIX + user.uid, JSON.stringify(list));
+          renderConvList(list);
+          return list;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      console.error("Unable to load conversations", lastError);
+      return [];
+    })();
+    try { return await _conversationLoadPromise; }
+    finally { _conversationLoadPromise = null; }
   }
+
+  window.addEventListener("pageshow", () => { if (currentUser && !isGuestMode) loadConversations(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentUser && !isGuestMode) loadConversations();
+  });
 
   function renderConvList(list) {
     const el = document.getElementById("convList");
+    if (!Array.isArray(list)) list = [];
     if (!list.length) {
       el.innerHTML = `<div class="conv-empty">${t("convEmpty")}</div>`;
       return;

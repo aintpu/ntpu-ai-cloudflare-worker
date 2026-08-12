@@ -173,3 +173,15 @@ test("語音結果只保留繁體中文與英文", () => {
   assert.equal(hasUnsupportedTranscriptionScript("テスト"), true);
   assert.equal(hasUnsupportedTranscriptionScript("테스트"), true);
 });
+
+test("登入後立即從快取顯示並重試同步對話清單", async () => {
+  const [html, index] = await Promise.all([
+    readFile("public/index.html", "utf8"),
+    readFile("src/index.js", "utf8"),
+  ]);
+  assert.match(html, /CONVERSATION_LIST_CACHE_PREFIX/);
+  assert.match(html, /for \(let attempt = 0; attempt < 3; attempt\+\+\)/);
+  assert.match(html, /cache: "no-store"/);
+  assert.match(html, /visibilitychange/);
+  assert.match(index, /"cache-control": "no-store"/);
+});

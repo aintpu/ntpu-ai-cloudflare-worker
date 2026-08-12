@@ -34,7 +34,7 @@ async function conversations(req, env, url) {
   const user = await owner(req, env); const path = url.pathname;
   if (path === "/conversations") {
     const rows = await env.DB.prepare("SELECT session_id,title,updated_at FROM sessions WHERE uid=? ORDER BY updated_at DESC LIMIT 100").bind(user.uid).all();
-    return json(rows.results || []);
+    return json(rows.results || [], 200, { "cache-control": "no-store" });
   }
   const m = pathMatch(path, /^\/conversations\/([^/]+)$/); if (m) {
     const row = await env.DB.prepare("SELECT title,history_json FROM sessions WHERE uid=? AND session_id=?").bind(user.uid, decodeURIComponent(m[1])).first();
