@@ -1,0 +1,1 @@
+ALTER TABLE message_feedback ADD COLUMN elapsed_ms INTEGER NOT NULL DEFAULT 0;

@@ -241,7 +241,7 @@
       <li><b><span class="zh">附檔案問內容</span><span class="en">Ask about a file</span></b>：<span class="zh">上傳 Word、PowerPoint、Excel、PDF、純文字或圖片後再提問，AI 會依檔案內容回答。單檔上限 20 MB。</span><span class="en">upload a Word, PowerPoint, Excel, PDF, plain-text or image file and ask about it. 20 MB per file.</span></li>
       <li><b><span class="zh">引用某段話追問</span><span class="en">Quote and follow up</span></b>：<span class="zh">在回答中選取一段文字，可以只針對那一段繼續問。</span><span class="en">select part of an answer and ask a follow-up about just that passage.</span></li>
       <li><b><span class="zh">語音輸入</span><span class="en">Voice input</span></b>：<span class="zh">用麥克風錄音轉成文字再送出，需要登入才能使用。</span><span class="en">record with the microphone and send the transcript. Requires sign-in.</span></li>
-      <li><b><span class="zh">對回答給回饋</span><span class="en">Rate an answer</span></b>：<span class="zh">每則回答下方都有讚與倒讚。按倒讚可以勾選問題類型（資訊錯誤、過時、答非所問、太籠統、找不到出處、其他）並補充說明，這些回饋會提供給管理者檢視。</span><span class="en">every answer has a thumbs-up and thumbs-down. Thumbs-down opens a short form for the problem type (incorrect, out of date, off topic, too vague, no source, other) and an optional comment, which administrators can review.</span></li>
+      <li><b><span class="zh">對回答給回饋</span><span class="en">Rate an answer</span></b>：<span class="zh">每則回答下方都有讚與倒讚。按倒讚可以勾選問題類型——等太久、內容有錯或編造、資訊過時、答非所問、太籠統、太冗長重複、沒讀到附件、語言用字不對、其他——並補充說明，這些回饋會提供給管理者檢視。選「等太久」時，系統會一併記錄這次回答實際花的時間。</span><span class="en">every answer has a thumbs-up and thumbs-down. Thumbs-down opens a short form for the problem type — too slow, incorrect or made up, out of date, off topic, too vague, too long, file not read, wrong language — plus an optional comment, all of which administrators can review. Choosing &quot;too slow&quot; also records how long that answer actually took.</span></li>
       <li><b><span class="zh">保存與分享對話</span><span class="en">Keep and share conversations</span></b>：<span class="zh">登入後對話會留在側欄，也可以產生唯讀連結分享出去。</span><span class="en">signed-in conversations stay in the sidebar and can be turned into a read-only share link.</span></li>
     </ul>
   </div>
@@ -487,7 +487,7 @@
       </div>
       <div class="item">
         <h3><span class="zh">回答層級回饋</span><span class="en">Answer-level feedback</span></h3>
-        <p><span class="zh">讚／倒讚以「Session ID ＋ 回答序號」為鍵，同一則回答只會保留最新一次；倒讚另存勾選的原因代碼與最多 1000 字的補充說明。這是唯一會保存使用者輸入文字的統計資料。</span><span class="en">Votes are keyed by session ID plus the answer's position, so re-voting replaces the previous one. A thumbs-down also stores the selected reason codes and an optional comment of up to 1,000 characters — the only free text kept for reporting.</span></p>
+        <p><span class="zh">讚／倒讚以「Session ID ＋ 回答序號」為鍵，同一則回答只會保留最新一次；倒讚另存勾選的原因代碼、最多 1000 字的補充說明，以及該次回答的實際耗時（判官加生成，方便追查速度問題）。這是唯一會保存使用者輸入文字的統計資料。</span><span class="en">Votes are keyed by session ID plus the answer's position, so re-voting replaces the previous one. A thumbs-down also stores the selected reason codes, an optional comment of up to 1,000 characters, and the answer's measured latency (judge plus generation) so slowness reports can be traced — the only free text kept for reporting.</span></p>
       </div>
       <div class="item">
         <h3><span class="zh">滿意度調查</span><span class="en">Satisfaction survey</span></h3>

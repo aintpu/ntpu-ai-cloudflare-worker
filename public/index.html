@@ -1861,13 +1861,13 @@
   }
 
   // ── 每則回答的讚／倒讚 ──
-  function _feedbackBarHtml(answerIndex, data) {
+  function _feedbackBarHtml(answerIndex, data, elapsedMs = 0) {
     const saved = _fbState.get(answerIndex);
     const model = data?.model || "";
     const route = data?.route || "";
     const up = saved?.vote === "up", down = saved?.vote === "down";
     return `
-      <div class="msg-actions" data-answer-index="${answerIndex}" data-model="${_esc(model)}" data-route="${_esc(route)}">
+      <div class="msg-actions" data-answer-index="${answerIndex}" data-model="${_esc(model)}" data-route="${_esc(route)}" data-elapsed="${Math.round(elapsedMs) || 0}">
         <button type="button" class="fb-btn fb-up${up ? " active" : ""}" title="${_esc(t("fbHelpful"))}" aria-label="${_esc(t("fbHelpful"))}" aria-pressed="${up}">${ICONS.thumbUp}</button>
         <button type="button" class="fb-btn fb-down${down ? " active" : ""}" title="${_esc(t("fbNotHelpful"))}" aria-label="${_esc(t("fbNotHelpful"))}" aria-pressed="${down}">${ICONS.thumbDown}</button>
         ${saved ? `<span class="fb-done">${_esc(t("fbThanks"))}</span>` : ""}
@@ -1925,6 +1925,7 @@
     const answerIndex = Number(bar.dataset.answerIndex);
     const model = bar.dataset.model || "";
     const route = bar.dataset.route || "";
+    const elapsedMs = Number(bar.dataset.elapsed) || 0;
     const body = bar.parentElement;
     body.querySelector(".fb-panel")?.remove();
 
@@ -1938,7 +1939,7 @@
         const reasons = [...panel.querySelectorAll("input:checked")].map(x => x.value);
         const comment = panel.querySelector(".fb-comment").value.trim();
         try {
-          await _sendMessageFeedback({ answer_index: answerIndex, vote: "down", reasons, comment, model, route });
+          await _sendMessageFeedback({ answer_index: answerIndex, vote: "down", reasons, comment, model, route, elapsed_ms: elapsedMs });
           _fbState.set(answerIndex, { vote: "down", reasons, comment });
           panel.remove();
           _markFeedbackDone(bar, "down");
@@ -1954,7 +1955,7 @@
     // 讚：再按一次可取消
     const cancel = _fbState.get(answerIndex)?.vote === "up";
     try {
-      await _sendMessageFeedback({ answer_index: answerIndex, vote: cancel ? null : "up", model, route });
+      await _sendMessageFeedback({ answer_index: answerIndex, vote: cancel ? null : "up", model, route, elapsed_ms: elapsedMs });
       if (cancel) {
         _fbState.delete(answerIndex);
         bar.querySelector(".fb-up").classList.remove("active");
@@ -2126,7 +2127,8 @@
     body.querySelector(".judge-panel")?.remove();
     body.insertAdjacentHTML("beforeend", _buildMeta(judgeEvt, answerMs));
     if (answerIndex !== null && content) {
-      body.insertAdjacentHTML("beforeend", _feedbackBarHtml(answerIndex, judgeEvt));
+      const elapsed = (judgeEvt?.judge_elapsed_ms || 0) + (answerMs || 0);
+      body.insertAdjacentHTML("beforeend", _feedbackBarHtml(answerIndex, judgeEvt, elapsed));
     }
     row.scrollIntoView({ block: "end", behavior: "smooth" });
   }
@@ -2475,11 +2477,14 @@
       fbThanks:         "已送出，謝謝你的回饋",
       fbPanelTitle:     "這個回答哪裡有問題？（可複選）",
       fbReasons:        {
-        wrong:      "資訊錯誤，與實際規定不符",
-        outdated:   "資訊過時",
+        slow:       "產生回答等太久",
+        wrong:      "內容有錯，或看起來是編造的",
+        outdated:   "資訊過時，不是現在的狀況",
         off_topic:  "答非所問，沒回答到我的問題",
-        too_vague:  "太籠統，不夠具體",
-        no_source:  "找不到出處，或來源連結有誤",
+        too_vague:  "太籠統，沒有具體可用的內容",
+        too_long:   "太冗長，或一直重複同樣的話",
+        file:       "沒有正確讀取我上傳的檔案",
+        language:   "語言或用字不對（例如出現簡體字）",
         other:      "其他",
       },
       fbCommentPlaceholder: "可以再多說一點嗎？（選填）",
@@ -2488,6 +2493,8 @@
       fbCancel:         "取消",
       fbFail:           "送出失敗：",
       statsMsgTitle:    "回答層級回饋（每則訊息的讚／倒讚）",
+      statsMsgSlow:     "反映太慢",
+      statsMsgSlowAvg:  "反映太慢的平均耗時",
       statsMsgTotal:    "回饋則數",
       statsMsgUp:       "讚",
       statsMsgDown:     "倒讚",
@@ -2496,7 +2503,7 @@
       statsMsgReasonCols:["原因","次數"],
       statsMsgByModelCols:["模型","讚","倒讚","好評率"],
       statsMsgCommentTitle: "倒讚明細",
-      statsMsgCommentCols:["使用者／訪客","模型","原因","補充說明","時間"],
+      statsMsgCommentCols:["使用者／訪客","模型","耗時","原因","補充說明","時間"],
       statsMsgEmpty:    "這段期間還沒有回答層級的回饋",
       surveyTitle:      "這次對話對你有幫助嗎？",
       surveySubtitle:   "此對話已達 3 個問題，請用一秒鐘告訴我們你的感受",
@@ -2695,11 +2702,14 @@
       fbThanks:         "Sent — thanks for the feedback",
       fbPanelTitle:     "What was wrong with this answer? (select all that apply)",
       fbReasons:        {
-        wrong:      "Incorrect — it doesn't match the actual rules",
+        slow:       "Took too long to answer",
+        wrong:      "Incorrect, or looks made up",
         outdated:   "Out of date",
         off_topic:  "It didn't answer my question",
-        too_vague:  "Too vague, not specific enough",
-        no_source:  "No source, or the source link is wrong",
+        too_vague:  "Too vague, nothing I can actually use",
+        too_long:   "Too long, or repeats itself",
+        file:       "It didn't read my uploaded file properly",
+        language:   "Wrong language or wording (e.g. Simplified Chinese)",
         other:      "Other",
       },
       fbCommentPlaceholder: "Anything you'd like to add? (optional)",
@@ -2708,6 +2718,8 @@
       fbCancel:         "Cancel",
       fbFail:           "Could not send: ",
       statsMsgTitle:    "Answer-level feedback (per-message votes)",
+      statsMsgSlow:     "Reported as slow",
+      statsMsgSlowAvg:  "Avg. latency when slow",
       statsMsgTotal:    "Votes",
       statsMsgUp:       "Helpful",
       statsMsgDown:     "Not helpful",
@@ -2716,7 +2728,7 @@
       statsMsgReasonCols:["Reason","Count"],
       statsMsgByModelCols:["Model","Helpful","Not helpful","Positive rate"],
       statsMsgCommentTitle: "Negative feedback detail",
-      statsMsgCommentCols:["User / Guest","Model","Reasons","Comment","Timestamp"],
+      statsMsgCommentCols:["User / Guest","Model","Latency","Reasons","Comment","Timestamp"],
       statsMsgEmpty:    "No answer-level feedback in this period",
       surveyTitle:      "Was this conversation helpful?",
       surveySubtitle:   "This session has reached 3 questions—tell us how it went",
@@ -3252,14 +3264,16 @@
           _csvCell(zh ? "讚" : "Helpful"), _csvCell(msgFb.up || 0),
           _csvCell(zh ? "倒讚" : "Not helpful"), _csvCell(msgFb.down || 0),
           _csvCell(zh ? "好評率" : "Positive rate"), _csvCell(`${msgFb.positive_percent || 0}%`),
+          _csvCell(zh ? "反映太慢" : "Reported as slow"), _csvCell(msgFb.slow_reports || 0),
+          _csvCell(zh ? "反映太慢的平均耗時（秒）" : "Avg. latency when slow (s)"), _csvCell(msgFb.slow_avg_ms ? (msgFb.slow_avg_ms / 1000).toFixed(1) : ""),
         ]);
         lines.push([], [_csvCell(zh ? "倒讚原因" : "Reason"), _csvCell(zh ? "次數" : "Count")]);
         for (const key of Object.keys(reasonLabels)) {
           lines.push([reasonLabels[key], (msgFb.reasons || {})[key] || 0].map(_csvCell));
         }
         lines.push([], (zh
-          ? ["倒讚明細","類型","模型","Session ID","回答序號","原因","補充說明","時間"]
-          : ["Negative feedback","Type","Model","Session ID","Answer #","Reasons","Comment","Timestamp"]
+          ? ["倒讚明細","類型","模型","Session ID","回答序號","耗時（秒）","原因","補充說明","時間"]
+          : ["Negative feedback","Type","Model","Session ID","Answer #","Latency (s)","Reasons","Comment","Timestamp"]
         ).map(_csvCell));
         for (const c of (msgFb.comments || [])) {
           const label = c.is_guest
@@ -3268,6 +3282,7 @@
           lines.push([
             label, c.is_guest ? (zh ? "訪客" : "Guest") : (zh ? "登入者" : "Signed-in"),
             c.model || "", c.session_id || "", c.answer_index ?? "",
+            c.elapsed_ms ? (c.elapsed_ms / 1000).toFixed(1) : "",
             (c.reasons || []).map(r => reasonLabels[r] || r).join(" / "),
             c.comment || "", c.timestamp || "",
           ].map(_csvCell));
@@ -3407,6 +3422,7 @@
         return `<tr>
           <td>${_esc(label)}</td>
           <td>${_esc(c.model ? _modelFullName(c.model) : "—")}</td>
+          <td style="white-space:nowrap">${c.elapsed_ms ? (c.elapsed_ms / 1000).toFixed(1) + " s" : "—"}</td>
           <td>${_esc(reasons)}</td>
           <td>${_esc(c.comment || "—")}</td>
           <td style="white-space:nowrap">${_esc((c.timestamp || "").replace("T", " ").slice(0, 16))}</td>
@@ -3423,6 +3439,8 @@
           <div class="stats-summary-card"><span>${t("statsMsgUp")}</span><strong>${msgFb.up || 0}</strong></div>
           <div class="stats-summary-card"><span>${t("statsMsgDown")}</span><strong>${msgFb.down || 0}</strong></div>
           <div class="stats-summary-card"><span>${t("statsMsgPositive")}</span><strong>${msgFb.positive_percent || 0}%</strong></div>
+          <div class="stats-summary-card"><span>${t("statsMsgSlow")}</span><strong>${msgFb.slow_reports || 0}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsMsgSlowAvg")}</span><strong>${msgFb.slow_avg_ms ? (msgFb.slow_avg_ms / 1000).toFixed(1) + " s" : "—"}</strong></div>
         </div>
         ${msgModelRows ? `<table class="a-table" style="margin-top:14px">
           <thead><tr>${msgCols.map((c,i) => `<th${i>0?' style="text-align:center"':''}>${c}</th>`).join("")}</tr></thead>
