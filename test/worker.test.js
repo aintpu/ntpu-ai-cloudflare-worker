@@ -54,6 +54,14 @@ test("一般路徑由 Static Assets 提供", async () => {
   assert.match(await response.text(), /doctype html/i);
 });
 
+test("/about/ 固定提供獨立 about.html", async () => {
+  let assetPath = "";
+  const routeEnv = { ASSETS: { fetch: async request => { assetPath = new URL(request.url).pathname; return new Response("<!doctype html><title>About</title>"); } } };
+  const response = await worker.fetch(new Request("https://ai.ntpu.ai/about/"), routeEnv);
+  assert.equal(response.status, 200);
+  assert.equal(assetPath, "/about.html");
+});
+
 test("新訪客統計直接記錄原始 ID，不雜湊或加密", async () => {
   const [chat, index] = await Promise.all([readFile("src/chat.js", "utf8"), readFile("src/index.js", "utf8")]);
   assert.match(chat, /statsUid: `guest:\$\{guestId\}`/);
