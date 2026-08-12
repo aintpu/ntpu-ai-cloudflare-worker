@@ -84,6 +84,10 @@ test("管理統計維持原版 users/by_model/satisfaction/feedback 格式", asy
   assert.equal(data.users[0].total, 4);
   assert.equal(data.users[0].conversations, 2);
   assert.equal(data.by_model[0].input_tokens, 40);
+  assert.equal(data.by_model[0].provider_model, "anthropic/claude-haiku-4.5");
+  assert.equal(data.by_model[0].estimated_cost_usd, 0.00014);
+  assert.equal(data.token_usage.estimated_cost_usd, 0.00014);
+  assert.equal(data.token_usage.pricing_source, "https://openrouter.ai/api/v1/models");
   assert.deepEqual(data.satisfaction, { responses:1, average:5, csat_percent:100, response_rate:100, distribution:{"1":0,"2":0,"3":0,"4":0,"5":1} });
   assert.equal(data.feedback[0].question_count, 3);
 });
@@ -115,6 +119,19 @@ test("每則回答都有讚／倒讚，倒讚可填原因", async () => {
   assert.match(html, /_feedbackPanelHtml/);
   assert.match(index, /INSERT INTO message_feedback/);
   assert.match(index, /vote 只能是 up 或 down/);
+});
+
+test("管理面板分開 Session 回饋與 Token 費用", async () => {
+  const [html, index, models] = await Promise.all([
+    readFile("public/index.html", "utf8"),
+    readFile("src/index.js", "utf8"),
+    readFile("src/models.js", "utf8"),
+  ]);
+  assert.match(html, /data-stats-view="sessions"/);
+  assert.match(html, /data-stats-view="tokens"/);
+  assert.match(html, /statsTokenCost/);
+  assert.match(index, /estimated_cost_usd/);
+  assert.match(models, /OPENROUTER_PRICING/);
 });
 
 test("搜尋按鈕不出現在附件選單，三題後才顯示滿意度問卷", async () => {

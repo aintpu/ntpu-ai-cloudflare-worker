@@ -1,7 +1,7 @@
 import { authenticate, requestMagicLink, requireAdmin, verifyMagicLink } from "./auth.js";
 import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
-import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE } from "./models.js";
+import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE, OPENROUTER_PRICING, providerModel } from "./models.js";
 import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders } from "./utils.js";
 
 const owner = async (req, env) => authenticate(req, env);
@@ -172,7 +172,30 @@ export async function adminStats(env, url) {
     if (count >= 3) eligibleSurveySessions++;
   }
   const users = [...userMap.values()].sort((a,b) => b.total-a.total);
-  const by_model = [...modelMap.values()].sort((a,b) => (b.input_tokens+b.output_tokens)-(a.input_tokens+a.output_tokens));
+  const roundUsd = value => Math.round(value * 100000000) / 100000000;
+  const by_model = [...modelMap.values()].map(item => {
+    const provider_model = providerModel(item.model);
+    const pricing = OPENROUTER_PRICING.usd_per_million[provider_model];
+    const input_cost_usd = pricing ? roundUsd(item.input_tokens * pricing.input / 1000000) : null;
+    const output_cost_usd = pricing ? roundUsd(item.output_tokens * pricing.output / 1000000) : null;
+    return {
+      ...item, provider_model,
+      input_price_usd_per_million: pricing?.input ?? null,
+      output_price_usd_per_million: pricing?.output ?? null,
+      input_cost_usd, output_cost_usd,
+      estimated_cost_usd: pricing ? roundUsd(input_cost_usd + output_cost_usd) : null,
+    };
+  }).sort((a,b) => (b.input_tokens+b.output_tokens)-(a.input_tokens+a.output_tokens));
+  const token_usage = by_model.reduce((summary, item) => {
+    summary.input_tokens += item.input_tokens;
+    summary.output_tokens += item.output_tokens;
+    if (item.estimated_cost_usd === null) summary.unpriced_models.push(item.provider_model);
+    else summary.estimated_cost_usd += item.estimated_cost_usd;
+    return summary;
+  }, { input_tokens:0, output_tokens:0, estimated_cost_usd:0, unpriced_models:[] });
+  token_usage.estimated_cost_usd = roundUsd(token_usage.estimated_cost_usd);
+  token_usage.pricing_as_of = OPENROUTER_PRICING.as_of;
+  token_usage.pricing_source = OPENROUTER_PRICING.source;
   const distribution = { "1":0,"2":0,"3":0,"4":0,"5":0 }; let sum=0, positive=0;
   const feedback = (feedbackResult.results || []).filter(x => x.rating>=1 && x.rating<=5).map(x => { distribution[String(x.rating)]++; sum+=x.rating; if(x.rating>=4)positive++; return { uid:legacyGuestUidMap.get(x.stats_uid)||x.stats_uid,email:x.email||"",is_guest:!!x.is_guest,session_id:x.session_id,rating:x.rating,question_count:x.question_count||0,timestamp:x.created_at }; });
   const responses=feedback.length;
@@ -213,7 +236,7 @@ export async function adminStats(env, url) {
     comments: messageComments.slice(0, 200),
   };
 
-  return { users, by_model, message_feedback, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
+  return { users, by_model, token_usage, message_feedback, satisfaction: { responses, average: responses ? Math.round(sum/responses*100)/100 : 0, csat_percent: responses ? Math.round(positive*1000/responses)/10 : 0, response_rate: eligibleSurveySessions ? Math.min(100,Math.round(responses*1000/eligibleSurveySessions)/10) : 0, distribution }, feedback };
 }
 
 async function admin(req, env, url) {

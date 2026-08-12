@@ -18,6 +18,24 @@ export const MODEL_PROVIDER_IDS = {
   "cloud-large-gemini": "google/gemini-2.5-pro",
 };
 
+// OpenRouter list prices in USD per 1M tokens. Snapshot from the official
+// model catalog; keep the date visible in the admin panel so costs are clearly
+// presented as estimates rather than invoices.
+export const OPENROUTER_PRICING = {
+  as_of: "2026-08-12",
+  source: "https://openrouter.ai/api/v1/models",
+  usd_per_million: {
+    "mistralai/mistral-small-2603": { input: 0.15, output: 0.60 },
+    "google/gemini-2.5-flash": { input: 0.30, output: 2.50 },
+    "anthropic/claude-haiku-4.5": { input: 1.00, output: 5.00 },
+    "google/gemini-3.1-flash-lite": { input: 0.25, output: 1.50 },
+    "anthropic/claude-sonnet-5": { input: 2.00, output: 10.00 },
+    "google/gemini-3.5-flash": { input: 1.50, output: 9.00 },
+    "anthropic/claude-opus-4.8": { input: 5.00, output: 25.00 },
+    "google/gemini-2.5-pro": { input: 1.25, output: 10.00 },
+  },
+};
+
 export const MODEL_NOTES = {
   "cloud-small-claude": "Claude Haiku 4.5：快速、省成本，適合簡單問答與短任務",
   "cloud-small-gemini": "Gemini 3.1 Flash-Lite：最快速、成本低，適合大量輕量任務",

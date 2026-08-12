@@ -635,6 +635,11 @@
   .stats-summary-card { border: 1px solid var(--cfg-border); border-radius: 10px; padding: 12px; background: var(--bg2); }
   .stats-summary-card strong { display: block; color: var(--text); font-size: 20px; margin-top: 4px; }
   .stats-summary-card span { color: var(--text4); font-size: 12px; }
+  .stats-view-tabs { display: flex; gap: 6px; padding: 4px; margin: 4px 0 16px; border-radius: 10px; background: var(--admin-tabs-bg); }
+  .stats-view-btn { flex: 1; border: 0; border-radius: 8px; padding: 9px 12px; background: transparent; color: var(--text4); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .stats-view-btn.active { background: var(--admin-bg); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .stats-cost { color: var(--text); font-variant-numeric: tabular-nums; }
+  .stats-pricing-note { margin-top: 12px; color: var(--text5); font-size: 11px; line-height: 1.5; }
 
   /* 對話滿意度：第三個成功回答後才出現的低干擾 CSAT 卡片 */
   /* ── 每則回答的讚／倒讚 ── */
@@ -979,6 +984,10 @@
           <button class="stats-range-btn" data-range="7d">近 7 天</button>
           <button class="stats-range-btn active" data-range="30d">近 30 天</button>
           <button class="stats-download-btn" id="stats-download-btn" type="button">下載 CSV 報告</button>
+        </div>
+        <div class="stats-view-tabs">
+          <button class="stats-view-btn active" data-stats-view="sessions" type="button">Session 與回答回饋</button>
+          <button class="stats-view-btn" data-stats-view="tokens" type="button">Token 使用量與費用</button>
         </div>
         <div id="stats-content"><div class="a-notice">載入中…</div></div>
       </div>
@@ -2587,9 +2596,13 @@
       saveBtn:          "儲存設定",
       cfgSaved:         "✓ 設定已儲存，約 30 秒後生效",
       statsRange:       "所有 Session 都會記錄；同一對話完成 3 題後才顯示滿意度問卷。Token 量含 judge 模型消耗",
+      statsViewSessions:"Session 與回答回饋",
+      statsViewTokens:  "Token 使用量與費用",
+      statsSessionRange:"所有 Session 都會記錄；同一對話完成 3 題後才顯示滿意度問卷。",
+      statsTokenRange:  "Token 分開計入 Judge 與回答模型；費用依 OpenRouter 公開牌價估算。",
       statsEmpty:       "此區間尚無使用記錄",
       statsLoading:     "載入中…",
-      statsCols:        ["使用者／訪客","Session","次數","小模型","中模型","大模型","輸入 Token","輸出 Token","總 Token"],
+      statsCols:        ["使用者／訪客","Session","次數","小模型","中模型","大模型"],
       statsGuest:       "訪客",
       statsDownload:    "下載 CSV 報告",
       statsDownloading: "產生報告中…",
@@ -2603,8 +2616,14 @@
       statsRangeYesterday: "昨天",
       statsRange7d:        "近 7 天",
       statsRange30d:       "近 30 天",
-      statsByModelTitle:   "依模型 Token 用量（乘上各家單價即可估算成本）",
-      statsByModelCols:    ["模型","呼叫次數","輸入 Token","輸出 Token","總 Token"],
+      statsByModelTitle:   "依模型 Token 用量與 OpenRouter 估算費用",
+      statsByModelCols:    ["模型","呼叫次數","輸入 Token","輸出 Token","輸入 $/M","輸出 $/M","估算費用"],
+      statsTokenInput:     "輸入 Token",
+      statsTokenOutput:    "輸出 Token",
+      statsTokenTotal:     "總 Token",
+      statsTokenCost:      "估算費用（USD）",
+      statsPricingNote:    "以 OpenRouter {date} 公開牌價估算；實際帳單可能因快取、供應商路由或折扣而不同。",
+      statsPriceUnknown:   "價格未知",
       usersEmpty:       "無使用者",
       usersSelf:        "(你)",
       usersAdminBadge:  "管理員",
@@ -2812,9 +2831,13 @@
       saveBtn:          "Save Settings",
       cfgSaved:         "✓ Settings saved. Takes effect in ~30 seconds.",
       statsRange:       "Every session is recorded; the satisfaction survey appears after 3 questions. Token counts include judge usage",
+      statsViewSessions:"Sessions & answer feedback",
+      statsViewTokens:  "Token usage & cost",
+      statsSessionRange:"Every session is recorded; the satisfaction survey appears after 3 questions.",
+      statsTokenRange:  "Judge and answer-model tokens are counted separately; cost uses OpenRouter list prices.",
       statsEmpty:       "No usage in this range",
       statsLoading:     "Loading…",
-      statsCols:        ["User / Guest","Sessions","Requests","Small","Medium","Large","Input Tokens","Output Tokens","Total Tokens"],
+      statsCols:        ["User / Guest","Sessions","Requests","Small","Medium","Large"],
       statsGuest:       "Guest",
       statsDownload:    "Download CSV report",
       statsDownloading: "Preparing report…",
@@ -2828,8 +2851,14 @@
       statsRangeYesterday: "Yesterday",
       statsRange7d:        "Last 7 days",
       statsRange30d:       "Last 30 days",
-      statsByModelTitle:   "Token usage by model (multiply by each vendor's price to estimate cost)",
-      statsByModelCols:    ["Model","Calls","Input Tokens","Output Tokens","Total Tokens"],
+      statsByModelTitle:   "Token usage and estimated OpenRouter cost by model",
+      statsByModelCols:    ["Model","Calls","Input Tokens","Output Tokens","Input $/M","Output $/M","Est. cost"],
+      statsTokenInput:     "Input tokens",
+      statsTokenOutput:    "Output tokens",
+      statsTokenTotal:     "Total tokens",
+      statsTokenCost:      "Estimated cost (USD)",
+      statsPricingNote:    "Estimated from OpenRouter list prices published {date}; the invoice may differ due to caching, provider routing, or discounts.",
+      statsPriceUnknown:   "Price unavailable",
       usersEmpty:       "No users",
       usersSelf:        "(you)",
       usersAdminBadge:  "Admin",
@@ -2950,6 +2979,8 @@
       if (_rangeLabels[b.dataset.range]) b.textContent = _rangeLabels[b.dataset.range];
     });
     document.getElementById("stats-download-btn").textContent = L.statsDownload;
+    document.querySelector('[data-stats-view="sessions"]').textContent = L.statsViewSessions;
+    document.querySelector('[data-stats-view="tokens"]').textContent = L.statsViewTokens;
     document.querySelector(".no-admin-box h3").textContent = L.noAdminH3;
     document.querySelector(".no-admin-box p").innerHTML = L.noAdminP.replace("\n","<br>");
     document.getElementById("becomeAdminBtn").textContent = L.becomeAdmin;
@@ -3148,6 +3179,7 @@
   // ── Stats ──
   // 目前選取的統計區間；預設「近 30 天」
   let _statsRange = "30d";
+  let _statsView = "sessions";
 
   // 依選取的區間算出 [start, end)（用台灣本地時間界定「今天／昨天」，再轉成 ISO/UTC 送後端）
   function _statsRangeBounds() {
@@ -3169,6 +3201,15 @@
       document.querySelectorAll(".stats-range-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       _statsRange = btn.dataset.range;
+      loadStats();
+    };
+  });
+
+  document.querySelectorAll(".stats-view-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".stats-view-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      _statsView = btn.dataset.statsView;
       loadStats();
     };
   });
@@ -3235,12 +3276,15 @@
       lines.push([], [
         _csvCell(zh ? "模型" : "Model"), _csvCell(zh ? "呼叫次數" : "Calls"),
         _csvCell(zh ? "輸入 Token" : "Input Tokens"), _csvCell(zh ? "輸出 Token" : "Output Tokens"),
-        _csvCell(zh ? "總 Token" : "Total Tokens"),
+        _csvCell(zh ? "總 Token" : "Total Tokens"), _csvCell(zh ? "輸入單價 USD/M" : "Input USD/M"),
+        _csvCell(zh ? "輸出單價 USD/M" : "Output USD/M"), _csvCell(zh ? "估算費用 USD" : "Estimated cost USD"),
       ]);
       for (const m of (data.by_model || [])) {
         lines.push([
           m.model, m.requests || 0, m.input_tokens || 0, m.output_tokens || 0,
           (m.input_tokens || 0) + (m.output_tokens || 0),
+          m.input_price_usd_per_million ?? "", m.output_price_usd_per_million ?? "",
+          m.estimated_cost_usd ?? "",
         ].map(_csvCell));
       }
       lines.push([], (zh
@@ -3322,16 +3366,17 @@
       const data = await res.json();
       const users = data.users || [];
       const byModel = data.by_model || [];
+      const tokenUsage = data.token_usage || {};
       const satisfaction = data.satisfaction || {};
       if (!users.length) {
         el.innerHTML = `<div class="a-notice">${t("statsEmpty")}</div>`; return;
       }
       const fmtTok = n => n >= 1000000 ? (n/1000000).toFixed(2)+"M" : n >= 1000 ? (n/1000).toFixed(1)+"K" : String(n);
       const cols = t("statsCols");
-      let totalReqs = 0, totalConvs = 0, totalIn = 0, totalOut = 0;
+      const fmtUsd = n => n === null || n === undefined ? t("statsPriceUnknown") : "$" + Number(n).toFixed(n >= 1 ? 4 : 6);
+      let totalReqs = 0, totalConvs = 0;
       let rows = users.map(u => {
         totalReqs += u.total; totalConvs += (u.conversations || 0);
-        totalIn += u.input_tokens; totalOut += u.output_tokens;
         const accountLabel = u.is_guest
           ? `${t("statsGuest")} #${String(u.uid || "").split(":").pop()}`
           : (u.email || u.uid);
@@ -3342,9 +3387,6 @@
           <td style="text-align:center">${u.small || 0}</td>
           <td style="text-align:center">${u.medium || 0}</td>
           <td style="text-align:center">${u.large || 0}</td>
-          <td style="text-align:center">${fmtTok(u.input_tokens)}</td>
-          <td style="text-align:center">${fmtTok(u.output_tokens)}</td>
-          <td style="text-align:center;font-weight:600">${fmtTok(u.input_tokens + u.output_tokens)}</td>
         </tr>`;
       }).join("");
       rows += `<tr style="background:var(--table-head-bg);font-weight:600">
@@ -3352,41 +3394,49 @@
         <td style="text-align:center">${totalConvs}</td>
         <td style="text-align:center">${totalReqs}</td>
         <td colspan="3"></td>
-        <td style="text-align:center">${fmtTok(totalIn)}</td>
-        <td style="text-align:center">${fmtTok(totalOut)}</td>
-        <td style="text-align:center">${fmtTok(totalIn+totalOut)}</td>
       </tr>`;
       // ── 依模型分列 Token（估算成本用）──
       const mCols = t("statsByModelCols");
-      let mIn = 0, mOut = 0;
       let modelRows = byModel.map(m => {
-        mIn += m.input_tokens; mOut += m.output_tokens;
         const name = m.model === "judge-model" ? "Judge · Mistral Small 4" : _modelFullName(m.model);
         return `<tr>
-          <td>${name}</td>
+          <td><strong>${_esc(name)}</strong><br><span style="font-size:10px;color:var(--text5)">${_esc(m.provider_model || m.model)}</span></td>
           <td style="text-align:center">${m.requests || 0}</td>
           <td style="text-align:center">${fmtTok(m.input_tokens)}</td>
           <td style="text-align:center">${fmtTok(m.output_tokens)}</td>
-          <td style="text-align:center;font-weight:600">${fmtTok(m.input_tokens + m.output_tokens)}</td>
+          <td style="text-align:center">${m.input_price_usd_per_million === null ? "—" : "$" + m.input_price_usd_per_million}</td>
+          <td style="text-align:center">${m.output_price_usd_per_million === null ? "—" : "$" + m.output_price_usd_per_million}</td>
+          <td style="text-align:center;font-weight:600" class="stats-cost">${fmtUsd(m.estimated_cost_usd)}</td>
         </tr>`;
       }).join("");
       if (byModel.length) {
         modelRows += `<tr style="background:var(--table-head-bg);font-weight:600">
           <td>${t("statsTotal")}</td>
           <td></td>
-          <td style="text-align:center">${fmtTok(mIn)}</td>
-          <td style="text-align:center">${fmtTok(mOut)}</td>
-          <td style="text-align:center">${fmtTok(mIn+mOut)}</td>
+          <td style="text-align:center">${fmtTok(tokenUsage.input_tokens || 0)}</td>
+          <td style="text-align:center">${fmtTok(tokenUsage.output_tokens || 0)}</td>
+          <td colspan="2"></td>
+          <td style="text-align:center" class="stats-cost">${fmtUsd(tokenUsage.estimated_cost_usd || 0)}</td>
         </tr>`;
       }
       const modelTable = byModel.length ? `
-        <p style="font-size:13px;font-weight:600;color:var(--text2);margin:22px 0 8px">${t("statsByModelTitle")}</p>
+        <p style="font-size:13px;font-weight:600;color:var(--text2);margin:0 0 8px">${t("statsByModelTitle")}</p>
         <table class="a-table">
           <thead><tr>
             ${mCols.map((c,i) => `<th${i>0?' style="text-align:center"':''}>${c}</th>`).join("")}
           </tr></thead>
           <tbody>${modelRows}</tbody>
-        </table>` : "";
+        </table>
+        <p class="stats-pricing-note">${t("statsPricingNote").replace("{date}", _esc(tokenUsage.pricing_as_of || "—"))}</p>` : "";
+      const tokenStatsHtml = `
+        <p style="font-size:12px;color:var(--text4);margin-bottom:12px">${t("statsTokenRange")}</p>
+        <div class="stats-summary">
+          <div class="stats-summary-card"><span>${t("statsTokenInput")}</span><strong>${fmtTok(tokenUsage.input_tokens || 0)}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsTokenOutput")}</span><strong>${fmtTok(tokenUsage.output_tokens || 0)}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsTokenTotal")}</span><strong>${fmtTok((tokenUsage.input_tokens || 0) + (tokenUsage.output_tokens || 0))}</strong></div>
+          <div class="stats-summary-card"><span>${t("statsTokenCost")}</span><strong>${fmtUsd(tokenUsage.estimated_cost_usd || 0)}</strong></div>
+        </div>
+        ${modelTable}`;
       const satisfactionHtml = `
         <div class="stats-summary">
           <div class="stats-summary-card"><span>${t("statsSurveyResponses")}</span><strong>${satisfaction.responses || 0}</strong></div>
@@ -3459,8 +3509,8 @@
           <tbody>${commentRows}</tbody>
         </table>` : ""}`}`;
 
-      el.innerHTML = `
-        <p style="font-size:12px;color:var(--text4);margin-bottom:12px">${t("statsRange")}</p>
+      const sessionStatsHtml = `
+        <p style="font-size:12px;color:var(--text4);margin-bottom:12px">${t("statsSessionRange")}</p>
         ${satisfactionHtml}
         <table class="a-table">
           <thead><tr>
@@ -3468,8 +3518,8 @@
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        ${modelTable}
         ${messageFeedbackHtml}`;
+      el.innerHTML = _statsView === "tokens" ? tokenStatsHtml : sessionStatsHtml;
     } catch (e) {
       el.innerHTML = `<div class="a-notice" style="color:var(--danger)">${t("loadingFail")}${e.message}</div>`;
     }
