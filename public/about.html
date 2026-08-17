@@ -546,10 +546,10 @@
     </div>
     <div class="credit">
       <span class="who">
-        <span class="zh">國立臺北大學 NTPU AI，由 AI4X 研發團隊開發與維護。</span>
-        <span class="en">NTPU AI, National Taipei University. Developed and maintained by the AI4X R&amp;D team.</span>
+        <span class="zh">國立臺北大學 NTPU AI，由 <a href="https://ai4x.ntpu.edu.tw/zh/index.html" target="_blank" rel="noopener">國立臺北大學跨域人工智慧前瞻研究中心</a>（AI4X Research Center）研發團隊開發與維護。</span>
+        <span class="en">NTPU AI, National Taipei University. Developed and maintained by the R&amp;D team of the <a href="https://ai4x.ntpu.edu.tw/index.html" target="_blank" rel="noopener">AI4X Research Center</a>, National Taipei University.</span>
       </span>
-      <a class="teamlink" href="https://ai4x.ntpu.edu.tw/zh/members.html#rd-team" target="_blank" rel="noopener"><span class="zh">認識 AI4X 研發團隊</span><span class="en">Meet the AI4X team</span><span class="arw">↗</span></a>
+      <a class="teamlink" href="https://ai4x.ntpu.edu.tw/zh/members.html#rd-team" data-href-zh="https://ai4x.ntpu.edu.tw/zh/members.html#rd-team" data-href-en="https://ai4x.ntpu.edu.tw/members.html#rd-team" target="_blank" rel="noopener"><span class="zh">認識 AI4X 研發團隊</span><span class="en">Meet the AI4X team</span><span class="arw">↗</span></a>
     </div>
   </div>
 </footer>
@@ -570,6 +570,10 @@
     function applyLang(value) {
       document.body.classList.toggle("lang-en", value === "en");
       document.documentElement.lang = value === "en" ? "en" : "zh-Hant";
+      var links = document.querySelectorAll("[data-href-zh][data-href-en]");
+      for (var i = 0; i < links.length; i++) {
+        links[i].href = value === "en" ? links[i].dataset.hrefEn : links[i].dataset.hrefZh;
+      }
     }
 
     var TECH_IDS = ["flow", "routing", "context", "security", "stack"];
