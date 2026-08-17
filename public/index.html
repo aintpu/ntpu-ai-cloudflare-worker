@@ -295,8 +295,6 @@
     font: inherit; font-size: 14px; line-height: 1.4; cursor: pointer;
     transition: background .15s, border-color .15s, color .15s;
   }
-  .eq-label { font-size: 12px; font-weight: 600; color: var(--text4); }
-  .example-question:hover .eq-label { color: var(--text2); }
   .example-question:hover {
     background: var(--sidebar-hover); border-color: var(--text4); color: var(--text);
   }
@@ -649,8 +647,10 @@
     width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px;
     background: none; color: var(--text5); cursor: pointer; transition: background .12s, color .12s;
   }
-  .fb-btn:hover { background: var(--sidebar-hover); color: var(--text2); }
+  .fb-btn:hover:not(:disabled) { background: var(--sidebar-hover); color: var(--text2); }
+  /* 送出後鎖住：未選中的那顆淡出，選中的維持 .active 高亮 */
   .fb-btn:disabled { cursor: default; }
+  .fb-btn:disabled:not(.active) { opacity: .35; }
   .fb-btn.active { color: var(--text); background: var(--sidebar-hover); }
   .fb-btn.active svg { fill: currentColor; fill-opacity: .16; }
   .fb-done { align-self: center; font-size: 12px; color: var(--text5); margin-left: 4px; }
@@ -1119,9 +1119,9 @@
         <h2>有什麼我能幫你的？</h2>
         <p>系統會自動判斷問題難度，並在小／中／大級距中選擇合適模型</p>
         <div class="example-questions">
-          <button type="button" class="example-question" data-example-index="0"><span class="eq-label">AI 對話｜基礎知識</span><span class="eq-text">用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini</span></button>
-          <button type="button" class="example-question" data-example-index="1"><span class="eq-label">學術搜尋｜研究探索</span><span class="eq-text">找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因</span></button>
-          <button type="button" class="example-question" data-example-index="2"><span class="eq-label">分析推理｜專題規劃</span><span class="eq-text">提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目</span></button>
+          <button type="button" class="example-question" data-example-index="0">用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini</button>
+          <button type="button" class="example-question" data-example-index="1">找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因</button>
+          <button type="button" class="example-question" data-example-index="2">提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目</button>
         </div>
       </div>
     </div>
@@ -1594,10 +1594,7 @@
   function welcomeHtml() {
     const questions = t("exampleQuestions");
     const buttons = questions.map((question, index) =>
-      `<button type="button" class="example-question" data-example-index="${index}">` +
-        `<span class="eq-label">${_esc(question.label)}</span>` +
-        `<span class="eq-text">${_esc(question.text)}</span>` +
-      `</button>`
+      `<button type="button" class="example-question" data-example-index="${index}">${_esc(question)}</button>`
     ).join("");
     return `<div class="welcome" id="welcome"><h2>${_esc(t("welcomeH2"))}</h2><p>${_esc(t("welcomeP"))}</p><div class="example-questions">${buttons}</div></div>`;
   }
@@ -1909,8 +1906,8 @@
     const up = saved?.vote === "up", down = saved?.vote === "down";
     return `
       <div class="msg-actions" data-answer-index="${answerIndex}" data-model="${_esc(model)}" data-route="${_esc(route)}" data-elapsed="${Math.round(elapsedMs) || 0}">
-        <button type="button" class="fb-btn fb-up${up ? " active" : ""}" title="${_esc(t("fbHelpful"))}" aria-label="${_esc(t("fbHelpful"))}" aria-pressed="${up}">${ICONS.thumbUp}</button>
-        <button type="button" class="fb-btn fb-down${down ? " active" : ""}" title="${_esc(t("fbNotHelpful"))}" aria-label="${_esc(t("fbNotHelpful"))}" aria-pressed="${down}">${ICONS.thumbDown}</button>
+        <button type="button" class="fb-btn fb-up${up ? " active" : ""}"${saved ? " disabled" : ""} title="${_esc(t("fbHelpful"))}" aria-label="${_esc(t("fbHelpful"))}" aria-pressed="${up}">${ICONS.thumbUp}</button>
+        <button type="button" class="fb-btn fb-down${down ? " active" : ""}"${saved ? " disabled" : ""} title="${_esc(t("fbNotHelpful"))}" aria-label="${_esc(t("fbNotHelpful"))}" aria-pressed="${down}">${ICONS.thumbDown}</button>
         ${saved ? `<span class="fb-done">${_esc(t("fbThanks"))}</span>` : ""}
       </div>`;
   }
@@ -1952,11 +1949,14 @@
     }
   }
 
+  // 回饋只能送出一次，送出後就把兩顆按鈕鎖住
   function _markFeedbackDone(bar, vote) {
-    bar.querySelector(".fb-up").classList.toggle("active", vote === "up");
-    bar.querySelector(".fb-up").setAttribute("aria-pressed", String(vote === "up"));
-    bar.querySelector(".fb-down").classList.toggle("active", vote === "down");
-    bar.querySelector(".fb-down").setAttribute("aria-pressed", String(vote === "down"));
+    for (const btn of bar.querySelectorAll(".fb-btn")) {
+      const isVoted = btn.classList.contains(vote === "up" ? "fb-up" : "fb-down");
+      btn.classList.toggle("active", isVoted);
+      btn.setAttribute("aria-pressed", String(isVoted));
+      btn.disabled = true;
+    }
     let done = bar.querySelector(".fb-done");
     if (!done) { done = document.createElement("span"); done.className = "fb-done"; bar.appendChild(done); }
     done.textContent = t("fbThanks");
@@ -1964,6 +1964,7 @@
 
   async function _handleFeedbackClick(button, bar) {
     const answerIndex = Number(bar.dataset.answerIndex);
+    if (_fbState.has(answerIndex)) return;   // 已送出過回饋，不接受第二次
     const model = bar.dataset.model || "";
     const route = bar.dataset.route || "";
     const elapsedMs = Number(bar.dataset.elapsed) || 0;
@@ -1993,20 +1994,15 @@
       return;
     }
 
-    // 讚：再按一次可取消
-    const cancel = _fbState.get(answerIndex)?.vote === "up";
+    // 讚：直接送出。先鎖住按鈕，避免連點送出多次請求
+    const buttons = [...bar.querySelectorAll(".fb-btn")];
+    for (const btn of buttons) btn.disabled = true;
     try {
-      await _sendMessageFeedback({ answer_index: answerIndex, vote: cancel ? null : "up", model, route, elapsed_ms: elapsedMs });
-      if (cancel) {
-        _fbState.delete(answerIndex);
-        bar.querySelector(".fb-up").classList.remove("active");
-        bar.querySelector(".fb-up").setAttribute("aria-pressed", "false");
-        bar.querySelector(".fb-done")?.remove();
-      } else {
-        _fbState.set(answerIndex, { vote: "up", reasons: [], comment: "" });
-        _markFeedbackDone(bar, "up");
-      }
+      await _sendMessageFeedback({ answer_index: answerIndex, vote: "up", model, route, elapsed_ms: elapsedMs });
+      _fbState.set(answerIndex, { vote: "up", reasons: [], comment: "" });
+      _markFeedbackDone(bar, "up");
     } catch (err) {
+      for (const btn of buttons) btn.disabled = false;
       alert(t("fbFail") + err.message);
     }
   }
@@ -2312,7 +2308,7 @@
     if (example) {
       const question = t("exampleQuestions")[Number(example.dataset.exampleIndex)];
       if (question) {
-        ta.value = question.text;
+        ta.value = question;
         send();
       }
       return;
@@ -2573,9 +2569,9 @@
       welcomeH2:        "有什麼我能幫你的？",
       welcomeP:         "系統會自動判斷問題難度，並在小／中／大級距中選擇合適模型",
       exampleQuestions: [
-        { label: "AI 對話｜基礎知識", text: "用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini" },
-        { label: "學術搜尋｜研究探索", text: "找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因" },
-        { label: "分析推理｜專題規劃", text: "提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目" },
+        "用簡單例子解釋什麼是生成式 AI，並比較 ChatGPT、Claude 與 Gemini",
+        "找出最重要的 3 篇 AI 論文，整理研究重點與值得閱讀的原因",
+        "提供 3 個跨領域 AI 期末專題主題，依資料取得難度、研究價值與兩週完成可行性評估，並推薦最佳題目",
       ],
       placeholder:      "輸入訊息… (Enter 送出，Shift+Enter 換行)",
       hint:             "AI 可能出錯，重要內容請自行驗證",
@@ -2811,9 +2807,9 @@
       welcomeH2:        "How can I help you?",
       welcomeP:         "The system auto-routes your question to the right model within small, medium, or large tiers",
       exampleQuestions: [
-        { label: "AI chat | Fundamentals", text: "Explain generative AI with simple examples, and compare ChatGPT, Claude and Gemini" },
-        { label: "Academic search | Research", text: "Find the 3 most important AI papers and summarize their key findings and why they're worth reading" },
-        { label: "Reasoning | Project planning", text: "Suggest 3 interdisciplinary AI final-project topics, assess each on data availability, research value and two-week feasibility, then recommend the best one" },
+        "Explain generative AI with simple examples, and compare ChatGPT, Claude and Gemini",
+        "Find the 3 most important AI papers and summarize their key findings and why they're worth reading",
+        "Suggest 3 interdisciplinary AI final-project topics, assess each on data availability, research value and two-week feasibility, then recommend the best one",
       ],
       placeholder:      "Type a message… (Enter to send, Shift+Enter for newline)",
       hint:             "AI may make mistakes. Please verify important information.",
@@ -3145,11 +3141,7 @@
     if (wp) wp.textContent = L.welcomeP;
     document.querySelectorAll(".example-question[data-example-index]").forEach(btn => {
       const question = L.exampleQuestions[Number(btn.dataset.exampleIndex)];
-      if (!question) return;
-      const label = btn.querySelector(".eq-label");
-      const text  = btn.querySelector(".eq-text");
-      if (label) label.textContent = question.label;
-      if (text)  text.textContent  = question.text;
+      if (question) btn.textContent = question;
     });
     // Conv list empty state
     const ce = document.querySelector(".conv-empty");
