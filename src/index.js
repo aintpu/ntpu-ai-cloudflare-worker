@@ -304,7 +304,7 @@ async function api(req, env) {
   if (p === "/chat/stream" && req.method === "POST") {
     const user = await authenticate(req, env, false), guest = req.headers.get("x-guest-id") || "";
     const key = user ? `chat:${user.uid}` : `chat:${clientIp(req)}:${guest}`;
-    const limited = await enforceRateLimit(env, key, user ? 20 : 5);
+    const limited = await enforceRateLimit(env, key, user ? 20 : 10);
     return limited || streamChat(req, env, user);
   }
   if (p === "/me") { const u = await owner(req,env); return json({uid:u.uid,email:u.email,admin:u.admin}); }

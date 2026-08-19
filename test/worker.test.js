@@ -11,6 +11,11 @@ const env = {
   ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) },
 };
 
+test("guest chat rate limit is 10 requests per minute", async () => {
+  const source = await readFile("src/index.js", "utf8");
+  assert.match(source, /enforceRateLimit\(env, key, user \? 20 : 10\)/);
+});
+
 test("health 明確標示純 Cloudflare、未使用 GCP", async () => {
   const response = await worker.fetch(new Request("https://example.com/health"), env);
   assert.equal(response.status, 200);
