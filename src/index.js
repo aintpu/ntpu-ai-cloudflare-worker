@@ -1,4 +1,4 @@
-import { authenticate, requestMagicLink, requireAdmin, verifyMagicLink } from "./auth.js";
+import { authenticate, loginWithAccess, logout, requireAdmin, requireTurnstile, verifyTurnstile } from "./auth.js";
 import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
 import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE, OPENROUTER_PRICING, providerModel } from "./models.js";
@@ -63,6 +63,7 @@ async function conversations(req, env, url) {
 async function upload(req, env) {
   const user = await authenticate(req, env, false); const guest = req.headers.get("x-guest-id") || "";
   if (!user && !/^[a-f0-9]{32}$/.test(guest)) return error("Missing auth token or guest ID", 401);
+  if (!user) { const turnstileError = await requireTurnstile(req, env); if (turnstileError) return turnstileError; }
   const limited = await enforceRateLimit(env, `upload:${user?.uid || `${clientIp(req)}:${guest}`}`, 10);
   if (limited) return limited;
   const form = await req.formData(); const file = form.get("file"); if (!(file instanceof File)) return error("缺少檔案", 400); if (file.size > 20 * 1024 * 1024) return error("檔案超過 20MB 上限", 413);
@@ -295,14 +296,17 @@ async function admin(req, env, url) {
 async function api(req, env) {
   const url = new URL(req.url), p = url.pathname;
   if (p === "/health") return json({ status: "ok", runtime: "cloudflare-native", gcp: false });
+  if (p === "/config" && req.method === "GET") return json({ turnstile_site_key: String(env.TURNSTILE_SITE_KEY || "") });
   if (p === "/models") return json({ candidates:MODEL_CANDIDATES, judge_model:JUDGE_ALIAS, notes:MODEL_NOTES, disabled:[] });
-  if (p === "/auth/request-link" && req.method === "POST") {
-    const limited = await enforceRateLimit(env, `login:${clientIp(req)}`, 5, 600);
-    return limited || requestMagicLink(req, env);
+  if (p === "/auth/turnstile/verify" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    return verifyTurnstile(req, env, body?.token);
   }
-  if (p === "/auth/verify" && req.method === "POST") return verifyMagicLink(req, env);
+  if (p === "/auth/access/login" && req.method === "GET") return loginWithAccess(req, env);
+  if (p === "/auth/logout" && req.method === "POST") return logout();
   if (p === "/chat/stream" && req.method === "POST") {
     const user = await authenticate(req, env, false), guest = req.headers.get("x-guest-id") || "";
+    if (!user) { const turnstileError = await requireTurnstile(req, env); if (turnstileError) return turnstileError; }
     const key = user ? `chat:${user.uid}` : `chat:${clientIp(req)}:${guest}`;
     const limited = await enforceRateLimit(env, key, user ? 20 : 10);
     return limited || streamChat(req, env, user);
