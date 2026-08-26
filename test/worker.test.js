@@ -26,7 +26,7 @@ test("Cloudflare Access replaces Magic Link without blocking guest mode", async 
   assert.match(authSource, /createRemoteJWKSet/);
   assert.match(authSource, /HttpOnly; Secure; SameSite=Lax/);
   assert.match(indexSource, /\/auth\/access\/login/);
-  assert.doesNotMatch(indexSource, /\/auth\/request-link|\/auth\/verify/);
+  assert.match(indexSource, /p === "\/auth\/request-link" \|\| p === "\/auth\/verify"/);
   assert.match(html, /auth\.signIn\(\)/);
   assert.match(html, /id="guestBtn"/);
   assert.doesNotMatch(html, /id="login-email-input"/);
@@ -50,6 +50,24 @@ test("health 明確標示純 Cloudflare、未使用 GCP", async () => {
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "ok", runtime: "cloudflare-native", gcp: false });
   assert.equal(response.headers.get("x-ntpu-edge"), "cloudflare-native");
+  assert.match(response.headers.get("content-security-policy"), /default-src 'self'/);
+});
+
+test("security headers protect the app and external Markdown script uses SRI", async () => {
+  const [html, utils] = await Promise.all([
+    readFile("public/index.html", "utf8"),
+    readFile("src/utils.js", "utf8"),
+  ]);
+  assert.match(utils, /Content-Security-Policy/);
+  assert.match(html, /cdn\.jsdelivr\.net\/npm\/marked@9\/marked\.min\.js[^>]+integrity="sha384-/);
+  assert.match(html, /marked@9\/marked\.min\.js[^>]+crossorigin="anonymous"/);
+});
+
+test("retired Magic Link routes and leaked login_token URLs are not served by the SPA", async () => {
+  const retired = await worker.fetch(new Request("https://example.com/auth/request-link"), env);
+  assert.equal(retired.status, 404);
+  const leaked = await worker.fetch(new Request("https://example.com/?login_token=retired"), env);
+  assert.equal(leaked.status, 410);
 });
 
 test("模型候選與原版 aintpu/aintpu 相同", async () => {

@@ -24,6 +24,22 @@ export function securityHeaders(response, edge = true) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), geolocation=(), payment=()");
   headers.set("X-Frame-Options", "DENY");
+  headers.set("Content-Security-Policy", [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self' https://ntpuai.cloudflareaccess.com",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com https://static.cloudflareinsights.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https://challenges.cloudflare.com https://ntpuai.cloudflareaccess.com https://static.cloudflareinsights.com",
+    "frame-src 'self' blob: https://challenges.cloudflare.com https://ntpuai.cloudflareaccess.com",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+  ].join("; "));
   if (edge) headers.set("X-NTPU-Edge", "cloudflare-native");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

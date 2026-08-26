@@ -295,6 +295,7 @@ async function admin(req, env, url) {
 
 async function api(req, env) {
   const url = new URL(req.url), p = url.pathname;
+  if (url.searchParams.has("login_token")) return error("舊版登入連結已失效，請重新登入", 410);
   if (p === "/health") return json({ status: "ok", runtime: "cloudflare-native", gcp: false });
   if (p === "/config" && req.method === "GET") return json({ turnstile_site_key: String(env.TURNSTILE_SITE_KEY || "") });
   if (p === "/models") return json({ candidates:MODEL_CANDIDATES, judge_model:JUDGE_ALIAS, notes:MODEL_NOTES, disabled:[] });
@@ -302,6 +303,7 @@ async function api(req, env) {
     const body = await req.json().catch(() => ({}));
     return verifyTurnstile(req, env, body?.token);
   }
+  if (p === "/auth/request-link" || p === "/auth/verify") return error("Not found", 404);
   if (p === "/auth/access/login" && req.method === "GET") return loginWithAccess(req, env);
   if (p === "/auth/logout" && req.method === "POST") return logout();
   if (p === "/chat/stream" && req.method === "POST") {
