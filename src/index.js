@@ -322,10 +322,10 @@ async function api(req, env) {
 
 export default { async fetch(req, env) { try {
   const response = await api(req,env);
-  if (response) return securityHeaders(response);
+  if (response) return await securityHeaders(response);
   const url = new URL(req.url);
   const assetRequest = ["/about", "/about/"].includes(url.pathname)
     ? new Request(new URL("/about.html", url), req)
     : req;
-  return securityHeaders(await env.ASSETS.fetch(assetRequest));
-} catch (e) { if (e instanceof Response) return securityHeaders(e); console.error(e); return securityHeaders(error("系統暫時無法回應",500)); } } };
+  return await securityHeaders(await env.ASSETS.fetch(assetRequest));
+} catch (e) { if (e instanceof Response) return await securityHeaders(e); console.error(e); return await securityHeaders(error("系統暫時無法回應",500)); } } };

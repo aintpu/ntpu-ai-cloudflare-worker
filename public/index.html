@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#ffffff" />
 <title>NTPU AI</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d0d0d'/%3E%3Cpath d='M14 16h36a6 6 0 0 1 6 6v16a6 6 0 0 1-6 6H30l-9 9v-9h-7a6 6 0 0 1-6-6V22a6 6 0 0 1 6-6z' fill='%23ffffff'/%3E%3Ctext x='32' y='37.5' text-anchor='middle' font-family='Arial, Helvetica, sans-serif' font-size='19' font-weight='800' fill='%230d0d0d'%3EN%3C/text%3E%3C/svg%3E" />
-<style>
+<style nonce="__CSP_NONCE__">
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* ── Design tokens ──
@@ -959,12 +959,12 @@
   <div class="admin-panel">
     <div class="admin-header">
       <h2>管理員面板</h2>
-      <button class="admin-close" onclick="closeAdmin()">&#x2715;</button>
+      <button class="admin-close" id="admin-close-btn">&#x2715;</button>
     </div>
     <div class="admin-tabs" id="admin-tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('stats')">使用統計</button>
-      <button class="tab-btn" onclick="switchTab('config')">路由設定</button>
-      <button class="tab-btn" onclick="switchTab('users')">使用者管理</button>
+      <button class="tab-btn active" data-admin-tab="stats">使用統計</button>
+      <button class="tab-btn" data-admin-tab="config">路由設定</button>
+      <button class="tab-btn" data-admin-tab="users">使用者管理</button>
     </div>
     <div class="admin-body">
 
@@ -1033,7 +1033,7 @@
             <option value="cloud-large-gemini">Gemini Pro（大模型）</option>
           </select>
         </div>
-        <button class="save-btn" onclick="saveConfig()">儲存設定</button>
+        <button class="save-btn" id="save-config-btn">儲存設定</button>
         <div class="cfg-msg" id="cfg-msg"></div>
       </div>
 
@@ -1060,16 +1060,16 @@
   <!-- 帳號與設定區（點擊展開選單，ChatGPT 式）-->
   <div class="sidebar-foot">
     <div class="user-menu hidden" id="userMenu">
-      <div class="user-menu-item" id="adminBtn" onclick="openAdmin()">
+      <div class="user-menu-item" id="adminBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span id="userMenuAdminLabel">管理員</span>
       </div>
-      <div class="user-menu-item" id="aboutBtn" onclick="openAbout()">
+      <div class="user-menu-item" id="aboutBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>
         <span id="userMenuAboutLabel">系統介紹</span>
         <svg class="menu-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
       </div>
-      <div class="user-menu-item" id="settingsBtn" onclick="openSettings()">
+      <div class="user-menu-item" id="settingsBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span id="userMenuSettingsLabel">設定</span>
       </div>
@@ -1172,7 +1172,7 @@
   <div class="settings-modal">
     <div class="settings-header">
       <h3 id="settings-title">設定</h3>
-      <button class="settings-close" onclick="closeSettings()">✕</button>
+      <button class="settings-close" id="settings-close-btn">✕</button>
     </div>
     <div class="settings-body">
       <label class="settings-label" id="settings-sys-label">系統提示詞</label>
@@ -1184,9 +1184,9 @@
       <textarea class="settings-textarea" id="memory-display" rows="4" readonly placeholder="（尚無記錄）"></textarea>
 
       <div class="settings-actions">
-        <button class="settings-save-btn" onclick="saveSettings()" id="settings-save-btn">儲存</button>
-        <button class="settings-export-btn" onclick="clearMemory()" id="memory-clear-btn">清除記憶</button>
-        <button class="settings-export-btn" onclick="exportConversation()" id="settings-export-btn">匯出對話</button>
+        <button class="settings-save-btn" id="settings-save-btn">儲存</button>
+        <button class="settings-export-btn" id="memory-clear-btn">清除記憶</button>
+        <button class="settings-export-btn" id="settings-export-btn">匯出對話</button>
       </div>
       <div class="settings-msg" id="settings-msg"></div>
     </div>
@@ -1198,7 +1198,7 @@
   <div class="share-toast-title" id="share-toast-title">分享此對話</div>
   <div class="share-toast-row">
     <input class="share-toast-input" id="share-link-input" type="text" readonly />
-    <button class="share-copy-btn" id="share-copy-btn" onclick="copyShareLink()">複製</button>
+    <button class="share-copy-btn" id="share-copy-btn">複製</button>
   </div>
 </div>
 
@@ -1210,7 +1210,7 @@
       <div class="preview-filename" id="preview-filename"></div>
       <div class="preview-filemeta" id="preview-filemeta"></div>
     </div>
-    <button class="preview-close" onclick="closePreview()">✕</button>
+    <button class="preview-close" id="preview-close-btn">✕</button>
   </div>
   <div class="preview-body" id="preview-body">
     <div class="preview-loading">載入中…</div>
@@ -1221,9 +1221,9 @@
 <button class="quote-float-btn" id="quoteFloatBtn">⤷ 引用提問</button>
 
 <!-- Markdown -->
-<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" integrity="sha384-odPBjvtXVM/5hOYIr3A1dB+flh0c3wAT3bSesIOqEGmyUA4JoKf/YTWy0XKOYAY7" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<script>
+<script nonce="__CSP_NONCE__">
   // 後端網址自動偵測：頁面由後端自己 serve（正式站 Cloud Run 或本機
   // uvicorn 都是），直接用同源即可，本機測試不用再手動改這裡；
   // 只有直接用 file:// 開啟 index.html 時才退回寫死的正式站網址。
@@ -1763,7 +1763,7 @@
           <div class="attach-chip-meta">${meta}</div>
           ${uploading ? "" : `<span class="attach-chip-badge">${ext}</span>`}
         </div>
-        ${uploading ? "" : `<button class="attach-remove" onclick="clearAttachPreview()">✕</button>`}
+        ${uploading ? "" : `<button class="attach-remove" data-action="clear-attach" type="button">✕</button>`}
       </div>`;
     preview.classList.add("show");
   }
@@ -1872,7 +1872,7 @@
         <div class="meta">
           <span class="badge ${cls}">${label}</span>
           ${timingHtml}
-          <button class="judge-toggle" onclick="document.getElementById('${id}').classList.toggle('open')">${t("judgeToggle")}</button>
+          <button class="judge-toggle" data-action="toggle-judge" data-target="${_escAttr(id)}" type="button">${t("judgeToggle")}</button>
         </div>
         <div class="judge-panel" id="${id}">
           ${t("judgeScore")} <b>${data.judge.score.toFixed(1)}</b> / 10<br>
@@ -2121,7 +2121,7 @@
     return `<div class="meta">
       <span class="badge ${cls}">${label}</span>
       ${timing}
-      <button class="judge-toggle" onclick="document.getElementById('${id}').classList.toggle('open')">${t("judgeToggle")}</button>
+      <button class="judge-toggle" data-action="toggle-judge" data-target="${_escAttr(id)}" type="button">${t("judgeToggle")}</button>
     </div>
     <div class="judge-panel" id="${id}">
       ${t("judgeScore")} <b>${judgeEvt.judge.score.toFixed(1)}</b> / 10<br>
@@ -2229,7 +2229,7 @@
   function _renderQuoteBar() {
     if (!_quotedText) { quoteBar.classList.remove("show"); quoteBar.innerHTML = ""; return; }
     quoteBar.innerHTML = `<div class="quote-bar-text">${_esc(_quotedText)}</div>
-      <button class="quote-bar-remove" onclick="clearQuote()" title="移除引用">✕</button>`;
+      <button class="quote-bar-remove" data-action="clear-quote" type="button" title="移除引用">✕</button>`;
     quoteBar.classList.add("show");
   }
 
@@ -3691,10 +3691,10 @@
     let rows = users.map(u => {
       const isSelf     = u.uid === currentUser.uid;
       const adminBadge = u.is_admin ? `<span class="user-badge">${t("usersAdminBadge")}</span>` : "";
-      const delBtn     = isSelf ? "" : `<button class="action-btn del" onclick="deleteUser('${u.uid}','${u.email}')">${t("usersDelete")}</button>`;
+      const delBtn     = isSelf ? "" : `<button class="action-btn del" data-action="delete-user" data-uid="${_escAttr(u.uid)}" data-email="${_escAttr(u.email)}" type="button">${t("usersDelete")}</button>`;
       const adminBtn   = isSelf ? "" : u.is_admin
-        ? `<button class="action-btn demote" onclick="toggleAdmin('${u.uid}',false)">${t("usersRevoke")}</button>`
-        : `<button class="action-btn promo"  onclick="toggleAdmin('${u.uid}',true)">${t("usersPromote")}</button>`;
+        ? `<button class="action-btn demote" data-action="toggle-admin" data-uid="${_escAttr(u.uid)}" data-make-admin="false" type="button">${t("usersRevoke")}</button>`
+        : `<button class="action-btn promo" data-action="toggle-admin" data-uid="${_escAttr(u.uid)}" data-make-admin="true" type="button">${t("usersPromote")}</button>`;
       const created = u.created_at ? new Date(u.created_at).toLocaleDateString(locale) : "-";
       return `<tr>
         <td>${u.email || u.uid} ${isSelf ? t("usersSelf") : ""}</td>
@@ -4012,7 +4012,7 @@
     header.innerHTML = `
       <div class="share-header" style="width:100%;display:flex;align-items:center;gap:12px;">
         <h2 id="share-view-title" style="font-size:15px;font-weight:600;color:var(--text);flex:1"></h2>
-        <button class="share-back-btn" onclick="window.location.href=window.location.pathname">${t("shareViewBack")}</button>
+        <button class="share-back-btn" data-action="share-back" type="button">${t("shareViewBack")}</button>
       </div>`;
 
     try {
@@ -4057,6 +4057,34 @@
       errEl.textContent = e.message;
     }
   };
+
+  document.getElementById("admin-close-btn").addEventListener("click", closeAdmin);
+  document.querySelectorAll("[data-admin-tab]").forEach(button => {
+    button.addEventListener("click", () => switchTab(button.dataset.adminTab));
+  });
+  document.getElementById("save-config-btn").addEventListener("click", saveConfig);
+  document.getElementById("adminBtn").addEventListener("click", openAdmin);
+  document.getElementById("aboutBtn").addEventListener("click", openAbout);
+  document.getElementById("settingsBtn").addEventListener("click", openSettings);
+  document.getElementById("settings-close-btn").addEventListener("click", closeSettings);
+  document.getElementById("settings-save-btn").addEventListener("click", saveSettings);
+  document.getElementById("memory-clear-btn").addEventListener("click", clearMemory);
+  document.getElementById("settings-export-btn").addEventListener("click", exportConversation);
+  document.getElementById("share-copy-btn").addEventListener("click", copyShareLink);
+  document.getElementById("preview-close-btn").addEventListener("click", closePreview);
+
+  document.addEventListener("click", event => {
+    const trigger = event.target.closest("[data-action]");
+    if (!trigger) return;
+    switch (trigger.dataset.action) {
+      case "clear-attach": clearAttachPreview(); break;
+      case "toggle-judge": document.getElementById(trigger.dataset.target)?.classList.toggle("open"); break;
+      case "clear-quote": clearQuote(); break;
+      case "delete-user": deleteUser(trigger.dataset.uid, trigger.dataset.email); break;
+      case "toggle-admin": toggleAdmin(trigger.dataset.uid, trigger.dataset.makeAdmin === "true"); break;
+      case "share-back": window.location.href = window.location.pathname; break;
+    }
+  });
 </script>
 </body>
 </html>

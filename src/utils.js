@@ -18,13 +18,49 @@ export async function sha256(text) {
 export function safeJson(text, fallback = null) { try { return JSON.parse(text); } catch { return fallback; } }
 export function uidFromEmail(email) { return `u_${email.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 80)}`; }
 export function sse(data) { return `data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`; }
-export function securityHeaders(response, edge = true) {
+function cspNonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes));
+}
+
+export async function securityHeaders(response, edge = true) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), geolocation=(), payment=()");
   headers.set("X-Frame-Options", "DENY");
   if (edge) headers.set("X-NTPU-Edge", "cloudflare-native");
+
+  const contentType = headers.get("content-type") || "";
+  if (contentType.toLowerCase().includes("text/html")) {
+    const nonce = cspNonce();
+    headers.set("Content-Security-Policy", [
+      "default-src 'self'",
+      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
+      "script-src-attr 'none'",
+      `style-src 'self' 'nonce-${nonce}'`,
+      "style-src-attr 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "media-src 'self' blob:",
+      "frame-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; "));
+    headers.delete("content-length");
+    headers.delete("content-encoding");
+    const html = await response.text();
+    return new Response(html.replaceAll("__CSP_NONCE__", nonce), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 export async function aesEncrypt(value, secret, aad = "") {
