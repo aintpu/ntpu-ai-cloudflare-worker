@@ -7,7 +7,7 @@
           ├─ Static Assets：前端
           ├─ D1：帳號、對話、統計、回饋、分享
           ├─ R2：使用者附件
-          ├─ Email Service：Magic Link 登入信
+          ├─ Zero Trust Access：學校帳號身分驗證
           └─ OpenAI API：回答、Web Search、語音辨識
 ```
 
@@ -39,11 +39,18 @@ npx wrangler secret put AUTH_SECRET
 npx wrangler secret put GUEST_ID_ENCRYPTION_KEY
 ```
 
-## Email Magic Link
+## Cloudflare Zero Trust Access
 
-登入不使用 Firebase。需先在 Cloudflare Email Service onboard `ntpu.ai`，完成 SPF、DKIM 等 DNS 驗證，再於 `wrangler.jsonc` 加入 `EMAIL` send binding。寄件者預設為 `NTPU AI <noreply@ntpu.ai>`，登入連結單次有效 15 分鐘。
+登入不使用 Firebase 或自建 Magic Link。Cloudflare Access 保護 `https://ai.ntpu.ai/auth/access/login`，Worker 會驗證 `Cf-Access-Jwt-Assertion`，再以 HttpOnly Cookie 建立本站 Session。訪客入口仍保持公開。
 
-允許申請帳號的網域：
+Cloudflare Access 應用程式設定完成後，將 Team Domain 與 Application Audience 設為 Worker secrets：
+
+```powershell
+npx wrangler secret put TEAM_DOMAIN
+npx wrangler secret put POLICY_AUD
+```
+
+允許登入的網域：
 
 - `gm.ntpu.edu.tw`
 - `ms.ntpu.edu.tw`

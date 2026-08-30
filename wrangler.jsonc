@@ -23,7 +23,7 @@
   },
   "vars": {
     "ADMIN_EMAIL": "aintpu@gmail.com",
-    "EMAIL_FROM": "noreply@ntpu.ai"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAEVHQU9WzerRnZlX"
   },
   "d1_databases": [
     {
@@ -37,12 +37,6 @@
     {
       "binding": "UPLOADS",
       "bucket_name": "ntpu-ai-worker-uploads"
-    }
-  ],
-  "send_email": [
-    {
-      "name": "EMAIL",
-      "allowed_sender_addresses": ["noreply@ntpu.ai"]
     }
   ],
   "observability": {

@@ -11,11 +11,63 @@ const env = {
   ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) },
 };
 
+test("guest chat rate limit is 10 requests per minute", async () => {
+  const source = await readFile("src/index.js", "utf8");
+  assert.match(source, /enforceRateLimit\(env, key, user \? 20 : 10\)/);
+});
+
+test("Cloudflare Access replaces Magic Link without blocking guest mode", async () => {
+  const [authSource, indexSource, html] = await Promise.all([
+    readFile("src/auth.js", "utf8"),
+    readFile("src/index.js", "utf8"),
+    readFile("public/index.html", "utf8"),
+  ]);
+  assert.match(authSource, /cf-access-jwt-assertion/i);
+  assert.match(authSource, /createRemoteJWKSet/);
+  assert.match(authSource, /HttpOnly; Secure; SameSite=Lax/);
+  assert.match(indexSource, /\/auth\/access\/login/);
+  assert.match(indexSource, /p === "\/auth\/request-link" \|\| p === "\/auth\/verify"/);
+  assert.match(html, /auth\.signIn\(\)/);
+  assert.match(html, /id="guestBtn"/);
+  assert.doesNotMatch(html, /id="login-email-input"/);
+});
+
+test("Access login rejects requests that did not pass Cloudflare Access", async () => {
+  const response = await worker.fetch(new Request("https://example.com/auth/access/login"), env);
+  assert.equal(response.status, 403);
+  assert.match((await response.json()).detail, /Cloudflare Access JWT/);
+});
+
+test("logout clears the HttpOnly application session", async () => {
+  const response = await worker.fetch(new Request("https://example.com/auth/logout", { method: "POST" }), env);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("set-cookie"), /ntpu_ai_session=;/);
+  assert.match(response.headers.get("set-cookie"), /HttpOnly; Secure; SameSite=Lax/);
+});
+
 test("health 明確標示純 Cloudflare、未使用 GCP", async () => {
   const response = await worker.fetch(new Request("https://example.com/health"), env);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "ok", runtime: "cloudflare-native", gcp: false });
   assert.equal(response.headers.get("x-ntpu-edge"), "cloudflare-native");
+  assert.match(response.headers.get("content-security-policy"), /default-src 'self'/);
+});
+
+test("security headers protect the app and external Markdown script uses SRI", async () => {
+  const [html, utils] = await Promise.all([
+    readFile("public/index.html", "utf8"),
+    readFile("src/utils.js", "utf8"),
+  ]);
+  assert.match(utils, /Content-Security-Policy/);
+  assert.match(html, /cdn\.jsdelivr\.net\/npm\/marked@9\.1\.6\/marked\.min\.js[^>]+integrity="sha384-/);
+  assert.match(html, /marked@9\.1\.6\/marked\.min\.js[^>]+crossorigin="anonymous"/);
+});
+
+test("retired Magic Link routes and leaked login_token URLs are not served by the SPA", async () => {
+  const retired = await worker.fetch(new Request("https://example.com/auth/request-link"), env);
+  assert.equal(retired.status, 404);
+  const leaked = await worker.fetch(new Request("https://example.com/?login_token=retired"), env);
+  assert.equal(leaked.status, 410);
 });
 
 test("模型候選與原版 aintpu/aintpu 相同", async () => {

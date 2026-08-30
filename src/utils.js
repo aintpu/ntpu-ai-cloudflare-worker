@@ -29,6 +29,22 @@ export async function securityHeaders(response, edge = true) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), geolocation=(), payment=()");
   headers.set("X-Frame-Options", "DENY");
+  headers.set("Content-Security-Policy", [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self' https://ntpuai.cloudflareaccess.com",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com https://static.cloudflareinsights.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https://challenges.cloudflare.com https://ntpuai.cloudflareaccess.com https://static.cloudflareinsights.com",
+    "frame-src 'self' blob: https://challenges.cloudflare.com https://ntpuai.cloudflareaccess.com",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+  ].join("; "));
   if (edge) headers.set("X-NTPU-Edge", "cloudflare-native");
 
   const contentType = headers.get("content-type") || "";
@@ -36,15 +52,15 @@ export async function securityHeaders(response, edge = true) {
     const nonce = cspNonce();
     headers.set("Content-Security-Policy", [
       "default-src 'self'",
-      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
+      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://challenges.cloudflare.com`,
       "script-src-attr 'none'",
       `style-src 'self' 'nonce-${nonce}'`,
       "style-src-attr 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      "connect-src 'self' https://challenges.cloudflare.com",
       "media-src 'self' blob:",
-      "frame-src 'self' blob:",
+      "frame-src 'self' blob: https://challenges.cloudflare.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -60,7 +76,7 @@ export async function securityHeaders(response, edge = true) {
     });
   }
 
-  headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  headers.set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 export async function aesEncrypt(value, secret, aad = "") {

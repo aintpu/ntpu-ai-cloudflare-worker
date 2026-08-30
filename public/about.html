@@ -467,11 +467,11 @@
     <div class="items">
       <div class="item">
         <h3><span class="zh">登入方式</span><span class="en">Sign-in</span></h3>
-        <p><span class="zh">寄出一次性連結，資料庫只存該連結的雜湊值，15 分鐘後失效且用過即作廢。允許的網域是 gm、ms、mail.ntpu.edu.tw，另加設定中的管理員信箱。</span><span class="en">A one-time link is emailed; only its hash is stored. It expires after 15 minutes and is invalidated once used. Allowed domains are gm, ms and mail.ntpu.edu.tw, plus the configured admin address.</span></p>
+        <p><span class="zh">Cloudflare Zero Trust Access 負責登入與身分驗證。Worker 會驗證 Access JWT 的簽章、簽發者與 Application Audience，再限制為 gm、ms、mail.ntpu.edu.tw，另加設定中的管理員信箱。</span><span class="en">Cloudflare Zero Trust Access handles sign-in and identity verification. The Worker validates the Access JWT signature, issuer and Application Audience, then restricts access to gm, ms and mail.ntpu.edu.tw plus the configured admin address.</span></p>
       </div>
       <div class="item">
         <h3><span class="zh">後續驗證</span><span class="en">Session tokens</span></h3>
-        <p><span class="zh">驗證成功後簽發 HMAC-SHA256 權杖，之後每次請求都檢查簽章與有效期限。</span><span class="en">After verification the Worker issues an HMAC-SHA256 token; every later request has its signature and expiry checked.</span></p>
+        <p><span class="zh">Access 驗證成功後，Worker 以 HttpOnly、Secure、SameSite Cookie 建立七天的本站 Session；瀏覽器 JavaScript 無法讀取 Session 權杖。</span><span class="en">After Access verification, the Worker creates a seven-day application session in an HttpOnly, Secure, SameSite cookie that browser JavaScript cannot read.</span></p>
       </div>
       <div class="item">
         <h3><span class="zh">回應標頭</span><span class="en">Response headers</span></h3>

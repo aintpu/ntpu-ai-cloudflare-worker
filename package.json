@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "fflate": "^0.8.2",
+    "jose": "^6.2.9",
     "opencc-js": "^1.4.1"
   }
 }
