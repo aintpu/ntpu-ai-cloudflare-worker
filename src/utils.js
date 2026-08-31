@@ -16,8 +16,23 @@ export async function sha256(text) {
   return base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(text))));
 }
 export function safeJson(text, fallback = null) { try { return JSON.parse(text); } catch { return fallback; } }
-export function uidFromEmail(email) { return `u_${email.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 80)}`; }
+// Keep the user identifier collision-resistant. Replacing punctuation with `_`
+// made distinct valid email addresses such as `a-b@...` and `a_b@...` share
+// the same UID and therefore the same D1 ownership scope.
+export function uidFromEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  return `u_${base64url(encoder.encode(normalized))}`;
+}
 export function sse(data) { return `data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`; }
+export function sameOriginRequest(request) {
+  const requestOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("origin");
+  if (origin) return origin === requestOrigin;
+  const referer = request.headers.get("referer");
+  if (!referer) return false;
+  try { return new URL(referer).origin === requestOrigin; } catch { return false; }
+}
+export const requireSameOrigin = request => sameOriginRequest(request) ? null : error("拒絕跨來源狀態變更", 403);
 function cspNonce() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return btoa(String.fromCharCode(...bytes));

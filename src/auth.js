@@ -65,7 +65,10 @@ async function verifyAccessIdentity(request, env) {
 
 async function upsertUserAndIssueToken(email, env) {
   const now = nowIso();
-  const uid = uidFromEmail(email);
+  // Preserve existing accounts while ensuring new accounts use the
+  // collision-resistant identifier from uidFromEmail().
+  const existing = await env.DB.prepare("SELECT uid FROM users WHERE email=?").bind(email).first();
+  const uid = existing?.uid || uidFromEmail(email);
   const admin = email === String(env.ADMIN_EMAIL || "").toLowerCase() ? 1 : 0;
   await env.DB.batch([
     env.DB.prepare("INSERT INTO users(uid,email,is_admin,created_at,last_login_at) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET last_login_at=excluded.last_login_at,is_admin=MAX(users.is_admin,excluded.is_admin)").bind(uid, email, admin, now, now),

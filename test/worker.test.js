@@ -6,6 +6,7 @@ import { extractOfficeText } from "../src/office.js";
 import { routeFromScore } from "../src/routing.js";
 import { MODEL_PROVIDER_IDS } from "../src/models.js";
 import { strToU8, zipSync } from "fflate";
+import { uidFromEmail } from "../src/utils.js";
 
 const env = {
   ASSETS: { fetch: async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) },
@@ -239,4 +240,24 @@ test("登入後立即從快取顯示並重試同步對話清單", async () => {
   assert.match(html, /cache: "no-store"/);
   assert.match(html, /visibilitychange/);
   assert.match(index, /"cache-control": "no-store"/);
+});
+
+test("user identifiers remain distinct for punctuation variants", () => {
+  assert.notEqual(
+    uidFromEmail("a-b@gm.ntpu.edu.tw"),
+    uidFromEmail("a_b@gm.ntpu.edu.tw"),
+  );
+});
+
+test("security hardening enforces state-changing methods and Office limits", async () => {
+  const [index, office] = await Promise.all([
+    readFile("src/index.js", "utf8"),
+    readFile("src/office.js", "utf8"),
+  ]);
+  assert.match(index, /toggle-admin.*req\.method === "POST"/s);
+  assert.match(index, /is_admin 必須是布林值/);
+  assert.match(index, /file-preview" && req\.method === "GET"/);
+  assert.match(index, /preview:\$\{user\?\.uid/);
+  assert.match(office, /MAX_OFFICE_TOTAL_BYTES/);
+  assert.match(office, /originalSize/);
 });

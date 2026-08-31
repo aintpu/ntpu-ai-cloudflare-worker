@@ -3753,9 +3753,10 @@
     if (!confirm(t("adminConfirm")(action))) return;
     try {
       const token = await currentUser.getIdToken();
-      const res   = await fetch(`${BASE_URL}/admin/users/${uid}/toggle-admin?is_admin=${makeAdmin}`, {
+      const res   = await fetch(`${BASE_URL}/admin/users/${uid}/toggle-admin`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ is_admin: makeAdmin }),
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
       loadUsers();

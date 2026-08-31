@@ -2,7 +2,7 @@ import { authenticate, loginWithAccess, logout, requireAdmin, requireTurnstile, 
 import { compressMemory, streamChat } from "./chat.js";
 import { extractOfficeText, OFFICE_MIMES } from "./office.js";
 import { JUDGE_ALIAS, MODEL_CANDIDATES, MODEL_NOTES, MODEL_TO_ROUTE, OPENROUTER_PRICING, providerModel } from "./models.js";
-import { aesDecrypt, error, json, nowIso, randomHex, safeJson, securityHeaders } from "./utils.js";
+import { aesDecrypt, error, json, nowIso, randomHex, requireSameOrigin, safeJson, securityHeaders } from "./utils.js";
 import { Converter } from "opencc-js";
 
 const owner = async (req, env) => authenticate(req, env);
@@ -32,20 +32,21 @@ function clientIp(req) {
 
 async function conversations(req, env, url) {
   const user = await owner(req, env); const path = url.pathname;
-  if (path === "/conversations") {
+  if (path === "/conversations" && req.method === "GET") {
     const rows = await env.DB.prepare("SELECT session_id,title,updated_at FROM sessions WHERE uid=? ORDER BY updated_at DESC LIMIT 100").bind(user.uid).all();
     return json(rows.results || [], 200, { "cache-control": "no-store" });
   }
-  const m = pathMatch(path, /^\/conversations\/([^/]+)$/); if (m) {
+  const m = pathMatch(path, /^\/conversations\/([^/]+)$/); if (m && req.method === "GET") {
     const row = await env.DB.prepare("SELECT title,history_json FROM sessions WHERE uid=? AND session_id=?").bind(user.uid, decodeURIComponent(m[1])).first();
     if (!row) return error("對話不存在", 404); return json({ session_id: decodeURIComponent(m[1]), title: row.title, history: safeJson(row.history_json, []) });
   }
-  const status = pathMatch(path, /^\/conversations\/([^/]+)\/memory-status$/); if (status) {
+  const status = pathMatch(path, /^\/conversations\/([^/]+)\/memory-status$/); if (status && req.method === "GET") {
     const sid = decodeURIComponent(status[1]);
     const row = await env.DB.prepare("SELECT memory_pending_since FROM sessions WHERE uid=? AND session_id=?").bind(user.uid, sid).first();
     return json({ pending_since: row?.memory_pending_since || null, interval_hours: 3 });
   }
   const compress = pathMatch(path, /^\/conversations\/([^/]+)\/memory-compress-now$/); if (compress && req.method === "POST") {
+    const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError;
     const sid = decodeURIComponent(compress[1]);
     const row = await env.DB.prepare("SELECT history_json FROM sessions WHERE uid=? AND session_id=?").bind(user.uid, sid).first();
     const history = safeJson(row?.history_json || "[]", []);
@@ -53,7 +54,8 @@ async function conversations(req, env, url) {
     await compressMemory(env, user.uid, sid, history);
     return json({ ok: true });
   }
-  const share = pathMatch(path, /^\/conversations\/([^/]+)\/share$/); if (share) {
+  const share = pathMatch(path, /^\/conversations\/([^/]+)\/share$/); if (share && req.method === "POST") {
+    const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError;
     const sid = decodeURIComponent(share[1]); const row = await env.DB.prepare("SELECT title,history_json FROM sessions WHERE uid=? AND session_id=?").bind(user.uid, sid).first();
     if (!row) return error("對話不存在", 404); const id = randomHex(12); await env.DB.prepare("INSERT INTO shares VALUES(?,?,?,?,?,?)").bind(id, user.uid, sid, row.title, row.history_json, nowIso()).run(); return json({ share_id: id });
   }
@@ -73,7 +75,11 @@ async function upload(req, env) {
 }
 
 async function preview(req, env, url) {
-  const user = await authenticate(req, env, false); const guest = req.headers.get("x-guest-id") || ""; const key = url.searchParams.get("path") || "";
+  const user = await authenticate(req, env, false); const guest = req.headers.get("x-guest-id") || "";
+  if (!user && !/^[a-f0-9]{32}$/.test(guest)) return error("Missing auth token or guest ID", 401);
+  const limited = await enforceRateLimit(env, `preview:${user?.uid || `${clientIp(req)}:${guest}`}`, 30);
+  if (limited) return limited;
+  const key = url.searchParams.get("path") || "";
   const prefix = user ? `uploads/${user.uid}/` : `uploads/guests/${guest}/`; if (!key.startsWith(prefix)) return error("無法存取此附件", 403);
   const object = await env.UPLOADS.get(key); if (!object) return error("檔案不存在", 404); const headers = new Headers(); object.writeHttpMetadata(headers); headers.set("etag", object.httpEtag); const type = headers.get("content-type") || "application/octet-stream";
   if (OFFICE_MIMES.has(type)) {
@@ -284,11 +290,11 @@ export async function adminStats(env, url) {
 
 async function admin(req, env, url) {
   const user = await requireAdmin(req, env); const p = url.pathname;
-  if (p === "/admin/setup") return json({ ok: true });
+  if (p === "/admin/setup" && req.method === "POST") { const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError; return json({ ok: true }); }
   if (p === "/admin/config") { if (req.method === "GET") { const row = await env.DB.prepare("SELECT value_json FROM app_config WHERE key='routing'").first(); return json({threshold_tiny:null,threshold_medium:4,threshold_large:7,force_model:null,prefer_local:false,...safeJson(row?.value_json || "{}", {})}); } const body = await req.json(); const force=body.force_model; if(force && !["small","medium","large","tiny"].includes(force) && !MODEL_TO_ROUTE[force])return error(`模型 ${force} 尚未在目前環境註冊`,400); await env.DB.prepare("INSERT INTO app_config VALUES('routing',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at").bind(JSON.stringify(body), nowIso()).run(); return json({ ok: true }); }
   if (p === "/admin/stats") return json(await adminStats(env, url));
   if (p === "/admin/users" && req.method === "GET") { const rows = await env.DB.prepare("SELECT uid,email,is_admin,created_at,last_login_at FROM users ORDER BY created_at DESC").all(); return json(rows.results || []); }
-  const toggle = pathMatch(p, /^\/admin\/users\/([^/]+)\/toggle-admin$/); if (toggle) { await env.DB.prepare("UPDATE users SET is_admin=? WHERE uid=?").bind(url.searchParams.get("is_admin") === "true" ? 1 : 0, decodeURIComponent(toggle[1])).run(); return json({ ok:true }); }
+  const toggle = pathMatch(p, /^\/admin\/users\/([^/]+)\/toggle-admin$/); if (toggle && req.method === "POST") { const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError; const body = await req.json().catch(() => null); if (typeof body?.is_admin !== "boolean") return error("is_admin 必須是布林值", 400); await env.DB.prepare("UPDATE users SET is_admin=? WHERE uid=?").bind(body.is_admin ? 1 : 0, decodeURIComponent(toggle[1])).run(); return json({ ok:true }); }
   const del = pathMatch(p, /^\/admin\/users\/([^/]+)$/); if (del && req.method === "DELETE") { if (decodeURIComponent(del[1]) === user.uid) return error("不能刪除自己",400); await env.DB.prepare("DELETE FROM users WHERE uid=?").bind(decodeURIComponent(del[1])).run(); return json({ok:true}); }
   return error("Not found", 404);
 }
@@ -315,13 +321,28 @@ async function api(req, env) {
   }
   if (p === "/me") { const u = await owner(req,env); return json({uid:u.uid,email:u.email,admin:u.admin}); }
   if (p.startsWith("/conversations/" ) || p === "/conversations") return conversations(req,env,url);
-  if (p === "/reset" && req.method === "POST") { const u=await owner(req,env); await env.DB.prepare("DELETE FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,url.searchParams.get("session_id")).run(); return json({ok:true}); }
-  if (p === "/upload" && req.method === "POST") return upload(req,env); if (p === "/file-preview") return preview(req,env,url); if (p === "/transcribe" && req.method === "POST") return transcribe(req,env);
-  if (p === "/user/profile") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT system_prompt FROM profiles WHERE uid=?").bind(u.uid).first();return json({system_prompt:x?.system_prompt||""});} const b=await req.json();await env.DB.prepare("INSERT INTO profiles(uid,system_prompt) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET system_prompt=excluded.system_prompt").bind(u.uid,String(b.system_prompt||"").slice(0,10000)).run();return json({ok:true}); }
-  if (p === "/user/memory") { const u=await owner(req,env); if(req.method==="GET"){const x=await env.DB.prepare("SELECT memory FROM profiles WHERE uid=?").bind(u.uid).first();return json({memory:x?.memory||""});} await env.DB.prepare("UPDATE profiles SET memory='',memory_updated_at=NULL WHERE uid=?").bind(u.uid).run();return json({ok:true}); }
+  if (p === "/reset" && req.method === "POST") { const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError; const u=await owner(req,env); await env.DB.prepare("DELETE FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,url.searchParams.get("session_id")).run(); return json({ok:true}); }
+  if (p === "/upload" && req.method === "POST") return upload(req,env); if (p === "/file-preview" && req.method === "GET") return preview(req,env,url); if (p === "/transcribe" && req.method === "POST") return transcribe(req,env);
+  if (p === "/user/profile") {
+    const u = await owner(req, env);
+    if (req.method === "GET") { const x = await env.DB.prepare("SELECT system_prompt FROM profiles WHERE uid=?").bind(u.uid).first(); return json({ system_prompt: x?.system_prompt || "" }); }
+    if (req.method !== "POST") return error("Method not allowed", 405);
+    const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError;
+    const b = await req.json().catch(() => null); if (!b) return error("請求格式不正確", 400);
+    await env.DB.prepare("INSERT INTO profiles(uid,system_prompt) VALUES(?,?) ON CONFLICT(uid) DO UPDATE SET system_prompt=excluded.system_prompt").bind(u.uid, String(b.system_prompt || "").slice(0, 10000)).run();
+    return json({ ok: true });
+  }
+  if (p === "/user/memory") {
+    const u = await owner(req, env);
+    if (req.method === "GET") { const x = await env.DB.prepare("SELECT memory FROM profiles WHERE uid=?").bind(u.uid).first(); return json({ memory: x?.memory || "" }); }
+    if (req.method !== "DELETE") return error("Method not allowed", 405);
+    const sameOriginError = requireSameOrigin(req); if (sameOriginError) return sameOriginError;
+    await env.DB.prepare("UPDATE profiles SET memory='',memory_updated_at=NULL WHERE uid=?").bind(u.uid).run();
+    return json({ ok: true });
+  }
   if (p === "/feedback/session" && req.method === "POST") { const u=await authenticate(req,env,false); const guest=req.headers.get("x-guest-id")||""; if(!u&&!/^[a-f0-9]{32}$/.test(guest))return error("Missing auth token or guest ID",401); const b=await req.json(); const stats=u?.uid || `guest:${guest}`; const count=u?(await env.DB.prepare("SELECT question_count n FROM sessions WHERE uid=? AND session_id=?").bind(u.uid,b.session_id).first())?.n:(await env.DB.prepare("SELECT COUNT(*) n FROM usage_logs WHERE stats_uid=? AND session_id=?").bind(stats,b.session_id).first())?.n; if(count<3)return error("此對話尚未達到 3 個問題，不能列為有效 session",400);await env.DB.prepare("INSERT INTO feedback(stats_uid,session_id,rating,is_guest,created_at,email,question_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(stats_uid,session_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at,email=excluded.email,question_count=excluded.question_count").bind(stats,b.session_id,b.rating,u?0:1,nowIso(),u?.email||"",count).run();return json({ok:true,question_count:count}); }
   if (p === "/feedback/message") return messageFeedback(req, env, url);
-  const shared=pathMatch(p,/^\/share\/([^/]+)$/); if(shared){const x=await env.DB.prepare("SELECT title,history_json FROM shares WHERE share_id=?").bind(shared[1]).first();return x?json({title:x.title,history:safeJson(x.history_json,[])}):error("分享連結不存在",404);}
+  const shared=pathMatch(p,/^\/share\/([^/]+)$/); if(shared && req.method === "GET"){const x=await env.DB.prepare("SELECT title,history_json FROM shares WHERE share_id=?").bind(shared[1]).first();return x?json({title:x.title,history:safeJson(x.history_json,[])}):error("分享連結不存在",404);}
   if (p.startsWith("/admin/")) return admin(req,env,url);
   return null;
 }

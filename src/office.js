@@ -20,9 +20,28 @@ function taggedText(xml, tag) {
   return values.filter(Boolean);
 }
 
+const MAX_OFFICE_ENTRIES = 200;
+const MAX_OFFICE_ENTRY_BYTES = 5 * 1024 * 1024;
+const MAX_OFFICE_TOTAL_BYTES = 10 * 1024 * 1024;
+function shouldExtractOfficeEntry(name, mime) {
+  if (mime.includes("wordprocessingml")) return name === "word/document.xml";
+  if (mime.includes("presentationml")) return /^ppt\/slides\/slide\d+\.xml$/.test(name);
+  if (mime.includes("spreadsheetml")) return name === "xl/sharedStrings.xml" || /^xl\/worksheets\/sheet\d+\.xml$/.test(name);
+  return false;
+}
 export function extractOfficeText(bytes, mime) {
   try {
-    const files = unzipSync(bytes), decoder = new TextDecoder(), values = [];
+    let entryCount = 0, totalBytes = 0;
+    const files = unzipSync(bytes, {
+      filter(file) {
+        entryCount++;
+        const originalSize = Number(file.originalSize);
+        if (entryCount > MAX_OFFICE_ENTRIES || !Number.isSafeInteger(originalSize) || originalSize < 0 || originalSize > MAX_OFFICE_ENTRY_BYTES) throw new Error("Office archive entry exceeds limits");
+        totalBytes += originalSize;
+        if (totalBytes > MAX_OFFICE_TOTAL_BYTES) throw new Error("Office archive exceeds limits");
+        return shouldExtractOfficeEntry(file.name, mime);
+      },
+    }), decoder = new TextDecoder(), values = [];
     if (mime.includes("wordprocessingml") && files["word/document.xml"]) {
       values.push(...taggedText(decoder.decode(files["word/document.xml"]), "w:t"));
     } else if (mime.includes("presentationml")) {
