@@ -40,6 +40,8 @@ ${turns}` }] }) });
   return memory;
 }
 __name(compressMemory, "compressMemory");
+// OpenRouter 會依 max_tokens 先預扣費用；64k 會讓餘額不多時連短問題都被拒絕（402），一般回答遠用不到這麼多。
+var ANSWER_MAX_TOKENS = 16e3;
 async function identity(request, env, authUser) {
   if (authUser) return { uid: authUser.uid, statsUid: authUser.uid, email: authUser.email, guest: false, encrypted: "" };
   const guestId = request.headers.get("x-guest-id") || "";
@@ -106,7 +108,7 @@ ${profile.system_prompt}`;
   const route = judge.route, model = judge.model;
   const messages = [{ role: "system", content: instructions }, ...history.map((m2) => ({ role: m2.role, content: String(m2.content || "") })), { role: "user", content: parts.length > 1 ? parts : parts[0].text }];
   const answerStartedAt = Date.now();
-  const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: openRouterHeaders(env), body: JSON.stringify({ model: providerModel(model), messages, max_tokens: 64e3, stream: true, stream_options: { include_usage: true } }) });
+  const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: openRouterHeaders(env), body: JSON.stringify({ model: providerModel(model), messages, max_tokens: ANSWER_MAX_TOKENS, stream: true, stream_options: { include_usage: true } }) });
   if (!upstream.ok || !upstream.body) return new Response(sse({ type: "error", message: "\u6A21\u578B\u670D\u52D9\u66AB\u6642\u7121\u6CD5\u56DE\u61C9" }), { status: 502, headers: { "content-type": "text/event-stream" } });
   const ts = new TransformStream();
   const writer = ts.writable.getWriter();

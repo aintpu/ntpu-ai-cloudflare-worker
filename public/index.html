@@ -1043,11 +1043,11 @@
             <option value="small">小模型候選池（由 judge 選）</option>
             <option value="medium">中模型候選池（由 judge 選）</option>
             <option value="large">大模型候選池（由 judge 選）</option>
-            <option value="cloud-small-claude">Haiku（小模型）</option>
+            <option value="cloud-small-claude-55">Haiku 5.5（小模型）</option>
             <option value="cloud-small-gemini">Gemini Flash-Lite（小模型）</option>
-            <option value="cloud-medium-claude">Sonnet（中模型）</option>
+            <option value="cloud-medium-claude-55">Sonnet 5.5（中模型）</option>
             <option value="cloud-medium-gemini">Gemini Flash（中模型）</option>
-            <option value="cloud-large-claude">Opus（大模型）</option>
+            <option value="cloud-large-claude-55">Opus 5.5（大模型）</option>
             <option value="cloud-large-gemini">Gemini Pro（大模型）</option>
           </select>
         </div>
@@ -1944,6 +1944,11 @@
   }
 
   const MODEL_META = {
+    "cloud-small-claude-55":  { cls: "small",  short: "Haiku 5.5",   full: "Claude Haiku 5.5" },
+    "cloud-medium-claude-55": { cls: "medium", short: "Sonnet 5.5",  full: "Claude Sonnet 5.5" },
+    "cloud-large-claude-55":  { cls: "large",  short: "Opus 5.5",    full: "Claude Opus 5.5" },
+    "perplexity/pplx-decider-v1.1-27b": { cls: "small", short: "Judge", full: "Judge · Perplexity Decider V1.1" },
+    "typesafe/jev-1.13":      { cls: "small",  short: "Judge",       full: "Judge · Jev 1.13（備援）" },
     "cloud-small-claude":  { cls: "small",  short: "Haiku",             full: "Claude Haiku 4.5" },
     "cloud-small-gemini":  { cls: "small",  short: "Gemini Flash-Lite", full: "Gemini 3.1 Flash-Lite" },
     "cloud-medium-claude": { cls: "medium", short: "Sonnet",            full: "Claude Sonnet 5" },
@@ -2043,7 +2048,7 @@
           <button class="judge-toggle" data-action="toggle-judge" data-target="${_escAttr(id)}" type="button">${t("judgeToggle")}</button>
         </div>
         <div class="judge-panel" id="${id}">
-          ${t("judgeScore")} <b>${data.judge.score.toFixed(1)}</b> / 10<br>
+          ${t("judgeScore")} <b>${data.judge.score < 0 ? "—" : data.judge.score.toFixed(1)}</b> / 10<br>
           ${data.judge_model ? `${t("judgeRouter")} <b>${_modelFullName(data.judge_model)}</b><br>` : ""}
           ${data.model ? `${t("judgeModel")} <b>${_modelFullName(data.model)}</b><br>` : ""}
           ${data.judge.reason || t("judgeNoReason")}
@@ -2292,7 +2297,7 @@
       <button class="judge-toggle" data-action="toggle-judge" data-target="${_escAttr(id)}" type="button">${t("judgeToggle")}</button>
     </div>
     <div class="judge-panel" id="${id}">
-      ${t("judgeScore")} <b>${judgeEvt.judge.score.toFixed(1)}</b> / 10<br>
+      ${t("judgeScore")} <b>${judgeEvt.judge.score < 0 ? "—" : judgeEvt.judge.score.toFixed(1)}</b> / 10<br>
       ${judgeEvt.judge_model ? `${t("judgeRouter")} <b>${_modelFullName(judgeEvt.judge_model)}</b><br>` : ""}
       ${judgeEvt.model ? `${t("judgeModel")} <b>${_modelFullName(judgeEvt.model)}</b><br>` : ""}
       ${judgeEvt.judge.reason || t("judgeNoReason")}
