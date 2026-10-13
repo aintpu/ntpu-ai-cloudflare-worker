@@ -6,7 +6,22 @@
 <meta name="theme-color" content="#ffffff" />
 <title>NTPU AI</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d0d0d'/%3E%3Cpath d='M14 16h36a6 6 0 0 1 6 6v16a6 6 0 0 1-6 6H30l-9 9v-9h-7a6 6 0 0 1-6-6V22a6 6 0 0 1 6-6z' fill='%23ffffff'/%3E%3Ctext x='32' y='37.5' text-anchor='middle' font-family='Arial, Helvetica, sans-serif' font-size='19' font-weight='800' fill='%230d0d0d'%3EN%3C/text%3E%3C/svg%3E" />
-<script nonce="__CSP_NONCE__" src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" integrity="sha384-uwaqwEq8O/ZDpmf2lmFejQZ9j7JsEYeJ14BQCYoqjeLhlWTeAEFcNKJg2Udw+qBI" crossorigin="anonymous" async defer></script>
+<!-- Turnstile's API script is intentionally loaded dynamically. Cloudflare updates
+     this script, so a fixed SRI digest would eventually block the widget. -->
+<script nonce="__CSP_NONCE__">
+  window.__ntpuTurnstileReady = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    const nonce = document.currentScript?.nonce;
+    if (nonce) script.nonce = nonce;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Turnstile script failed to load"));
+    document.head.appendChild(script);
+  });
+</script>
 <style nonce="__CSP_NONCE__">
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -947,7 +962,7 @@
     <div id="turnstile-container" class="turnstile-wrap hidden" aria-label="Cloudflare Turnstile security verification"></div>
     <div id="auth-login-step">
       <button class="auth-btn primary" id="loginBtn">使用學校帳號登入</button>
-      <p class="google-btn-sub" id="auth-domain-hint">透過 Cloudflare Zero Trust Access 安全驗證身分</p>
+      <p class="google-btn-sub" id="auth-domain-hint">透過國立臺北大學單一登入（SSO）驗證身分</p>
       <div class="auth-divider" id="guest-divider">或</div>
       <button class="auth-btn secondary" id="guestBtn">以訪客身分試用</button>
       <p class="google-btn-sub" id="guest-hint">訪客對話不會儲存，部分功能無法使用</p>
@@ -1247,11 +1262,11 @@
     thumbDown: _svg('<path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3z"/><path d="M17 14l-4.2 7.2a1 1 0 0 1-1.8-.2l-.4-1.4a4 4 0 0 1 .2-2.8L12 14H6.4a2 2 0 0 1-2-2.5l1.6-6A2 2 0 0 1 7.9 4H17"/>', 17),
   };
 
-  // Cloudflare Zero Trust Access 負責驗證身分；本站 Session 僅存於 HttpOnly Cookie。
+  // 學校 SSO（SAML）負責驗證身分；本站 Session 僅存於 HttpOnly Cookie。
   const CONVERSATION_LIST_CACHE_PREFIX = "ntpu_ai_conversation_list:";
   const _authListeners = [];
   const _makeUser = data => ({
-    uid: data.uid, email: data.email, displayName: "",
+    uid: data.uid, email: data.email, displayName: data.display_name || "", affiliation: data.affiliation || [],
     getIdToken: async () => "",
     getIdTokenResult: async () => ({ claims: { admin: data.admin === true } }),
   });
@@ -1260,9 +1275,32 @@
   let _authUser = null;
   const auth = {
     languageCode: "zh-TW",
-    signIn: () => location.assign(`${BASE_URL}/auth/access/login`),
-    refresh: async () => { const r=await fetch(`${BASE_URL}/me`,{cache:"no-store"}); if(!r.ok)return; const data=await r.json(); _authUser=_makeUser(data); _authListeners.forEach(fn=>fn(_authUser)); },
-    signOut: async () => { await fetch(`${BASE_URL}/auth/logout`,{method:"POST"}).catch(()=>{});_authUser=null;_authListeners.forEach(fn=>fn(null)); },
+    signIn: () => {
+      const ssoOrigin = location.hostname === "ai.ntpu.ai" ? "https://ai.ntpu.edu.tw" : BASE_URL;
+      location.assign(`${ssoOrigin}/auth/saml/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+    },
+    refresh: async () => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const r = await fetch(`${BASE_URL}/me`, { cache: "no-store", credentials: "same-origin" });
+          if (r.ok) {
+            const data = await r.json();
+            _authUser = _makeUser(data);
+            _authListeners.forEach(fn => fn(_authUser));
+            return true;
+          }
+        } catch (_) {}
+        if (attempt < 3) await new Promise(resolve => setTimeout(resolve, [150, 400, 900][attempt]));
+      }
+      return false;
+    },
+    signOut: async () => {
+      // 公用電腦上不留個人資料：清掉對話列表快取（含標題）、上次開啟的對話、問卷狀態；語言與深色模式等介面偏好保留。
+      try {
+        const userKeyPrefixes = [CONVERSATION_LIST_CACHE_PREFIX, "ai_session_", "ntpu_ai_session_survey:"];
+        Object.keys(localStorage).filter(k => userKeyPrefixes.some(p => k.startsWith(p))).forEach(k => localStorage.removeItem(k));
+      } catch (_) {}
+      await fetch(`${BASE_URL}/auth/logout`,{method:"POST",credentials:"same-origin"}).catch(()=>{});_authUser=null;_authListeners.forEach(fn=>fn(null)); },
     onAuthStateChanged: fn => { _authListeners.push(fn); queueMicrotask(()=>fn(_authUser)); },
   };
 
@@ -1284,11 +1322,13 @@
   let turnstileEnabled = false;
   let turnstileToken = "";
   let turnstileWidgetId = null;
+  let turnstileState = "loading";
 
   function renderTurnstile(siteKey) {
     if (!siteKey || !turnstileContainer || turnstileWidgetId !== null) return;
-    if (!window.turnstile) { setTimeout(() => renderTurnstile(siteKey), 150); return; }
+    if (!window.turnstile) throw new Error("Turnstile API unavailable");
     turnstileEnabled = true;
+    turnstileState = "ready";
     turnstileContainer.classList.remove("hidden");
     turnstileWidgetId = window.turnstile.render(turnstileContainer, {
       sitekey: siteKey,
@@ -1302,14 +1342,22 @@
   async function initTurnstile() {
     try {
       const response = await fetch(`${BASE_URL}/config`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Turnstile config failed (${response.status})`);
       const config = await response.json();
-      renderTurnstile(String(config.turnstile_site_key || ""));
+      const siteKey = String(config.turnstile_site_key || "");
+      if (!siteKey) { turnstileState = "disabled"; return; }
+      await window.__ntpuTurnstileReady;
+      renderTurnstile(siteKey);
     } catch (cause) {
+      turnstileState = "error";
+      setAuthMsg("安全驗證載入失敗，請重新整理頁面", false);
       console.warn("Turnstile configuration unavailable", cause);
     }
   }
 
   async function verifyTurnstileBeforeAction() {
+    if (turnstileState === "loading") { setAuthMsg("安全驗證載入中，請稍候", true); return false; }
+    if (turnstileState === "error") { setAuthMsg("安全驗證載入失敗，請重新整理頁面", false); return false; }
     if (!turnstileEnabled) return true;
     if (!turnstileToken) { setAuthMsg("請先完成 Cloudflare 安全驗證", false); return false; }
     const response = await fetch(`${BASE_URL}/auth/turnstile/verify`, {
@@ -1327,10 +1375,7 @@
     return true;
   }
 
-  document.getElementById("loginBtn").onclick = async () => {
-    if (!(await verifyTurnstileBeforeAction())) return;
-    auth.signIn();
-  };
+  document.getElementById("loginBtn").onclick = () => auth.signIn();
   setTimeout(() => auth.refresh(), 0);
   setTimeout(() => initTurnstile(), 0);
 
@@ -1369,13 +1414,18 @@
     return id;
   }
 
+  function setElementDisplay(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.style.display = value;
+  }
+
   function applyGuestCapabilities() {
-    document.getElementById("adminBtn").style.display = !isGuestMode && isAdmin ? "flex" : "none";
-    document.getElementById("settingsBtn").style.display = isGuestMode ? "none" : "";
-    document.getElementById("menuFileItem").style.display = "";
-    document.getElementById("menuSearchItem").style.display = "";
-    document.getElementById("menuNtpuItem").style.display = "";
-    document.getElementById("micBtn").style.display = isGuestMode ? "none" : "";
+    setElementDisplay("adminBtn", !isGuestMode && isAdmin ? "flex" : "none");
+    setElementDisplay("settingsBtn", isGuestMode ? "none" : "");
+    setElementDisplay("menuFileItem", "");
+    setElementDisplay("menuSearchItem", "");
+    setElementDisplay("menuNtpuItem", "");
+    setElementDisplay("micBtn", isGuestMode ? "none" : "");
     _searchEnabled = false;
     _ntpuSearchEnabled = false;
     _updateSearchUI();
@@ -1407,14 +1457,15 @@
     sessionSurveyShown = false;
     document.getElementById("auth-overlay").classList.remove("hidden");
     document.getElementById("user-email").textContent = "";
-    document.getElementById("settingsBtn").style.display = "";
-    document.getElementById("menuFileItem").style.display = "";
-    document.getElementById("menuSearchItem").style.display = "";
-    document.getElementById("menuNtpuItem").style.display = "";
-    document.getElementById("micBtn").style.display = "";
+    setElementDisplay("settingsBtn", "");
+    setElementDisplay("menuFileItem", "");
+    setElementDisplay("menuSearchItem", "");
+    setElementDisplay("menuNtpuItem", "");
+    setElementDisplay("micBtn", "");
     renderConvList([]);
     resetUI();
   }
+
 
   document.getElementById("guestBtn").onclick = async () => {
     if (!(await verifyTurnstileBeforeAction())) return;
@@ -1433,7 +1484,7 @@
     if (user) {
       // 再向 Worker 驗證權杖與帳號狀態。
       const errEl = document.getElementById("auth-err");
-      try {
+      if (false) { try {
         const token = await user.getIdToken();
         const meRes = await fetch(`${BASE_URL}/me`, { headers: { "Authorization": `Bearer ${token}` } });
         if (!meRes.ok) {
@@ -1443,14 +1494,16 @@
           return;
         }
         errEl.textContent = "";
-      } catch (_) {}
+      } catch (_) {} }
 
       document.getElementById("auth-overlay").classList.add("hidden");
       document.getElementById("user-email").textContent = user.displayName || user.email;
+      document.getElementById("user-email").title = user.email || "";
       document.getElementById("userAvatar").textContent = (user.displayName || user.email || "?").charAt(0);
       const key = `ai_session_${user.uid}`;
       const savedSid = localStorage.getItem(key);
       sessionId = savedSid || newSession(user.uid);
+      _conversationEmptyRetryUsed = false;
       sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear();
       sessionSurveyShown = false;
 
@@ -1467,16 +1520,29 @@
         const cached = JSON.parse(localStorage.getItem(CONVERSATION_LIST_CACHE_PREFIX + user.uid) || "[]");
         if (Array.isArray(cached) && cached.length) renderConvList(cached);
       } catch (_) {}
+      startConversationSync(user);
+      scheduleConversationWarmup(user);
       await loadConversations();
 
       // 重新整理後自動恢復上次對話內容
       if (savedSid) {
         try {
           const token = await currentUser.getIdToken();
+          const requestHeaders = {};
+          // Access sessions use the HttpOnly cookie. Avoid sending an empty
+          // Authorization header on the first page load.
+          if (token) requestHeaders.Authorization = `Bearer ${token}`;
           const res = await fetch(`${BASE_URL}/conversations/${encodeURIComponent(savedSid)}`, {
-            headers: { "Authorization": `Bearer ${token}` },
+            headers: requestHeaders,
+            credentials: "same-origin",
           });
-          if (res.ok) {
+          if (res.status === 404) {
+            // The saved conversation may have been deleted on another device.
+            // Drop the stale local pointer so every future login starts cleanly.
+            localStorage.removeItem(key);
+            sessionId = newSession(user.uid);
+            resetUI();
+          } else if (res.ok) {
             const data = await res.json();
             if (data.history?.length) renderLoadedHistory(data.history);
           }
@@ -1484,8 +1550,12 @@
       }
       refreshMemoryRing();
     } else {
+      stopConversationSync();
+      _conversationEmptyRetryUsed = false;
       document.getElementById("auth-overlay").classList.remove("hidden");
       document.getElementById("user-email").textContent = "";
+      document.getElementById("user-email").title = "";
+      document.getElementById("userAvatar").textContent = "U";
       document.getElementById("adminBtn").style.display = "none";
       sessionId = null; isAdmin = false;
       sessionQuestionCount = 0; sessionAnswerCount = 0; _fbState.clear(); sessionSurveyShown = false;
@@ -1506,32 +1576,106 @@
 
   // ── Conversation list ──
   let _conversationLoadPromise = null;
+  let _conversationRetryTimer = null;
+  let _conversationSyncTimer = null;
+  let _conversationWarmupTimer = null;
+  let _conversationWarmupTicks = 0;
+  let _conversationEmptyRetryUsed = false;
+
+  function stopConversationWarmup() {
+    if (_conversationWarmupTimer) {
+      clearTimeout(_conversationWarmupTimer);
+      _conversationWarmupTimer = null;
+    }
+    _conversationWarmupTicks = 0;
+  }
+
+  function scheduleConversationWarmup(user) {
+    stopConversationWarmup();
+    const tick = () => {
+      if (currentUser !== user || isGuestMode || document.visibilityState !== "visible") return;
+      loadConversations().then(list => {
+        if (list.length || ++_conversationWarmupTicks >= 6) {
+          stopConversationWarmup();
+          return;
+        }
+        _conversationWarmupTimer = setTimeout(tick, 5000);
+      });
+    };
+    _conversationWarmupTimer = setTimeout(tick, 5000);
+  }
+
+  function startConversationSync(user) {
+    if (_conversationSyncTimer) clearInterval(_conversationSyncTimer);
+    _conversationSyncTimer = setInterval(() => {
+      if (currentUser === user && !isGuestMode && document.visibilityState === "visible") {
+        loadConversations();
+      }
+    }, 15000);
+  }
+
+  function stopConversationSync() {
+    if (_conversationSyncTimer) {
+      clearInterval(_conversationSyncTimer);
+      _conversationSyncTimer = null;
+    }
+    stopConversationWarmup();
+  }
+
   async function loadConversations() {
     if (!currentUser || isGuestMode) return [];
     if (_conversationLoadPromise) return _conversationLoadPromise;
     const user = currentUser;
     _conversationLoadPromise = (async () => {
       let lastError;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 5; attempt++) {
         try {
-          if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 400));
+          if (attempt) await new Promise(resolve => setTimeout(resolve, [300, 800, 1600, 3000][attempt - 1]));
           const token = await user.getIdToken();
+          const requestHeaders = {};
+          if (token) requestHeaders.Authorization = `Bearer ${token}`;
           const res = await fetch(`${BASE_URL}/conversations`, {
-            headers: { "Authorization": `Bearer ${token}` },
+            headers: requestHeaders,
             cache: "no-store",
+            credentials: "same-origin",
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const list = await res.json();
           if (!Array.isArray(list)) throw new Error("Invalid conversation list");
           if (currentUser !== user || isGuestMode) return list;
+          // Right after an Access redirect, a D1 read can briefly be empty.
+          // Keep the last known list and retry instead of showing a false
+          // empty state while the page remains open.
+          if (!list.length && attempt < 4) continue;
+          if (_conversationRetryTimer) { clearTimeout(_conversationRetryTimer); _conversationRetryTimer = null; }
           localStorage.setItem(CONVERSATION_LIST_CACHE_PREFIX + user.uid, JSON.stringify(list));
           renderConvList(list);
+          if (list.length) {
+            _conversationEmptyRetryUsed = false;
+            stopConversationWarmup();
+          }
+          if (!list.length && currentUser === user && !isGuestMode && !_conversationEmptyRetryUsed) {
+            // Do one delayed background read as well. This covers a short
+            // D1 propagation window without requiring the user to navigate
+            // away and return to the page.
+            _conversationEmptyRetryUsed = true;
+            _conversationRetryTimer = setTimeout(() => {
+              _conversationRetryTimer = null;
+              loadConversations();
+            }, 1000);
+          }
           return list;
         } catch (error) {
           lastError = error;
         }
       }
       console.error("Unable to load conversations", lastError);
+      if (currentUser === user && !isGuestMode && !_conversationRetryTimer) {
+        _conversationRetryTimer = setTimeout(() => {
+          _conversationRetryTimer = null;
+          loadConversations();
+        }, 2500);
+      }
       return [];
     })();
     try { return await _conversationLoadPromise; }
@@ -1539,6 +1683,7 @@
   }
 
   window.addEventListener("pageshow", () => { if (currentUser && !isGuestMode) loadConversations(); });
+  window.addEventListener("focus", () => { if (currentUser && !isGuestMode) loadConversations(); });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentUser && !isGuestMode) loadConversations();
   });
@@ -1605,6 +1750,7 @@
       const token = await currentUser.getIdToken();
       const res = await fetch(`${BASE_URL}/conversations/${encodeURIComponent(sid)}`, {
         headers: { "Authorization": `Bearer ${token}` },
+        credentials: "same-origin",
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -2510,7 +2656,12 @@
         }),
         signal: _abortCtrl.signal,
       });
-      if (!res.ok) throw new Error("伺服器錯誤 " + res.status);
+      if (!res.ok) {
+        let detail = "";
+        try { detail = (await res.json()).detail || ""; } catch (_) {}
+        if (!detail && res.status === 429 && isGuestMode) detail = "已達訪客使用次數，請使用學校帳號登入後繼續使用";
+        throw new Error(detail || "伺服器錯誤 " + res.status);
+      }
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
@@ -2645,7 +2796,7 @@
       guestHint:        "訪客對話不會儲存；可使用附件與搜尋，無法使用語音、分享與長期記憶",
       guestName:        "訪客",
       authEmailPlaceholder: "you@gm.ntpu.edu.tw",
-      authDomainHint:   "透過 Cloudflare Zero Trust Access 安全驗證身分",
+      authDomainHint:   "透過國立臺北大學單一登入（SSO）驗證身分",
       authInvalidEmail: "請輸入有效的電子信箱",
       authLinkSent:     "登入連結已寄至 {email}，請至信箱點擊完成登入。",
       authEmailAgain:   "請重新輸入接收登入連結的學校信箱：",
@@ -2883,7 +3034,7 @@
       guestHint:        "Guest chats are not saved. Files and search are available; voice, sharing, and memory are unavailable.",
       guestName:        "Guest",
       authEmailPlaceholder: "you@gm.ntpu.edu.tw",
-      authDomainHint:   "Identity is securely verified by Cloudflare Zero Trust Access",
+      authDomainHint:   "Identity is verified by NTPU Single Sign-On (SSO)",
       authInvalidEmail: "Enter a valid email address",
       authLinkSent:     "A sign-in link was sent to {email}. Open your email to finish signing in.",
       authEmailAgain:   "Re-enter the school email that received this sign-in link:",
