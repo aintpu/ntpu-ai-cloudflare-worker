@@ -109,7 +109,13 @@ ${profile.system_prompt}`;
   const messages = [{ role: "system", content: instructions }, ...history.map((m2) => ({ role: m2.role, content: String(m2.content || "") })), { role: "user", content: parts.length > 1 ? parts : parts[0].text }];
   const answerStartedAt = Date.now();
   const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: openRouterHeaders(env), body: JSON.stringify({ model: providerModel(model), messages, max_tokens: ANSWER_MAX_TOKENS, stream: true, stream_options: { include_usage: true } }) });
-  if (!upstream.ok || !upstream.body) return new Response(sse({ type: "error", message: "\u6A21\u578B\u670D\u52D9\u66AB\u6642\u7121\u6CD5\u56DE\u61C9" }), { status: 502, headers: { "content-type": "text/event-stream" } });
+  if (!upstream.ok || !upstream.body) {
+    const detail = await upstream.text().catch(() => "");
+    console.error("OpenRouter answer request failed", upstream.status, providerModel(model), detail.slice(0, 500));
+    // 402 是 OpenRouter 餘額不足；其他狀態多半是模型暫時無法使用。
+    const message = upstream.status === 402 ? "AI \u670D\u52D9\u984D\u5EA6\u4E0D\u8DB3\uFF0C\u8ACB\u901A\u77E5\u7BA1\u7406\u54E1" : "\u6A21\u578B\u670D\u52D9\u66AB\u6642\u7121\u6CD5\u56DE\u61C9";
+    return new Response(sse({ type: "error", message }), { status: 502, headers: { "content-type": "text/event-stream" } });
+  }
   const ts = new TransformStream();
   const writer = ts.writable.getWriter();
   const enc2 = new TextEncoder();

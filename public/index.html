@@ -2663,7 +2663,12 @@
       });
       if (!res.ok) {
         let detail = "";
-        try { detail = (await res.json()).detail || ""; } catch (_) {}
+        try {
+          const body = await res.text();
+          // 一般錯誤是 JSON {detail}；模型呼叫失敗時是 SSE 的 data: {"type":"error","message"}
+          const sseError = body.match(/^data: (.+)$/m);
+          detail = sseError ? (JSON.parse(sseError[1]).message || "") : (JSON.parse(body).detail || "");
+        } catch (_) {}
         if (!detail && res.status === 429 && isGuestMode) detail = "已達訪客使用次數，請使用學校帳號登入後繼續使用";
         throw new Error(detail || "伺服器錯誤 " + res.status);
       }
