@@ -5,3 +5,6 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# 學校 IdP metadata 不放進公開 repo（部署時需在本機提供）
+saml/idp-metadata.xml

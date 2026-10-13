@@ -1,0 +1,43 @@
+name = "ntpu-ai-cloudflare-worker"
+main = "src/index.js"
+compatibility_date = "2026-08-11"
+compatibility_flags = ["nodejs_compat"]
+
+[[rules]]
+type = "Text"
+globs = ["**/*.xml"]
+fallthrough = false
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ntpu-ai-worker-db"
+database_id = "20e20d0c-78d4-42ae-8348-fcb5cd78b6fc"
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "ntpu-ai-worker-uploads"
+
+[ai]
+binding = "AI"
+
+[vars]
+ADMIN_EMAIL = "aintpu@gmail.com"
+TURNSTILE_SITE_KEY = "0x4AAAAAAEVHQU9WzerRnZlX"
+
+# Secrets (set via `wrangler secret put <NAME>`, not stored here):
+# AUTH_SECRET, GUEST_ID_ENCRYPTION_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY,
+# TURNSTILE_SECRET_KEY
+#
+# SAML SSO (see src/saml.js), all optional until 資訊中心 confirms details:
+# SAML_EMAIL_ATTRIBUTE - exact attribute name/URN 資訊中心 says carries the email (falls back to a guess list otherwise)
+# SAML_SP_PRIVATE_KEY  - PEM private key; if set, AuthnRequest is signed. Leave unset while unsigned requests are OK.
+# SAML_SP_BASE_URL     - SP origin used for entityID/ACS (default https://ai.ntpu.edu.tw). Set to http://localhost:8787 in .dev.vars.
+# SAML_IDP_METADATA_XML - LOCAL TESTING ONLY (.dev.vars): replaces saml/idp-metadata.xml with test/saml-fixture's fake IdP. Never set in production.
+
+[[routes]]
+pattern = "ai.ntpu.ai"
+custom_domain = true
