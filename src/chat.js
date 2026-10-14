@@ -1,5 +1,5 @@
 import { __name, safeJson, nowIso, json, sse } from "./utils.js";
-import { openRouterHeaders, providerModel, MEMORY_ALIAS } from "./models.js";
+import { openRouterHeaders, providerModel, MEMORY_ALIAS, MODEL_CANDIDATES } from "./models.js";
 import { loadRoutingConfig, classifyDifficulty } from "./routing.js";
 import { OFFICE_MIMES, extractOfficeText } from "./office.js";
 
@@ -105,13 +105,21 @@ ${profile.system_prompt}`;
   else instructions += "\n\u4F60\u6C92\u6709\u5373\u6642\u4E0A\u7DB2\u6216\u641C\u5C0B\u80FD\u529B\u3002\u82E5\u554F\u984C\u9700\u8981\u6700\u65B0\u8CC7\u8A0A\uFF0C\u8ACB\u5EFA\u8B70\u4F7F\u7528\u8005\u958B\u555F\u641C\u5C0B\uFF1B\u5207\u52FF\u5047\u88DD\u5DF2\u641C\u5C0B\u6216\u7DE8\u9020\u6700\u65B0\u8CC7\u6599\u3002";
   const routingConfig = await loadRoutingConfig(env);
   const judge = await classifyDifficulty(env, req.message, history, routingConfig, !!authUser?.admin);
-  const route = judge.route, model = judge.model;
+  const route = judge.route;
+  let model = judge.model;
   const messages = [{ role: "system", content: instructions }, ...history.map((m2) => ({ role: m2.role, content: String(m2.content || "") })), { role: "user", content: parts.length > 1 ? parts : parts[0].text }];
   const answerStartedAt = Date.now();
-  const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: openRouterHeaders(env), body: JSON.stringify({ model: providerModel(model), messages, max_tokens: ANSWER_MAX_TOKENS, stream: true, stream_options: { include_usage: true } }) });
-  if (!upstream.ok || !upstream.body) {
+  // 某個模型失敗（例如 403「此地區無法使用」）時，改用同級距的下一個模型；402 是餘額不足，換模型也沒用。
+  const fallbacks = [model, ...(MODEL_CANDIDATES[route] || []).filter((m2) => m2 !== model)];
+  let upstream;
+  for (const candidate of fallbacks) {
+    upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: openRouterHeaders(env), body: JSON.stringify({ model: providerModel(candidate), messages, max_tokens: ANSWER_MAX_TOKENS, stream: true, stream_options: { include_usage: true } }) });
+    if (upstream.ok && upstream.body) { model = candidate; break; }
     const detail = await upstream.text().catch(() => "");
-    console.error("OpenRouter answer request failed", upstream.status, providerModel(model), detail.slice(0, 500));
+    console.error("OpenRouter answer request failed", upstream.status, providerModel(candidate), detail.slice(0, 500));
+    if (upstream.status === 402) break;
+  }
+  if (!upstream.ok || !upstream.body) {
     // 402 是 OpenRouter 餘額不足；其他狀態多半是模型暫時無法使用。
     const message = upstream.status === 402 ? "AI \u670D\u52D9\u984D\u5EA6\u4E0D\u8DB3\uFF0C\u8ACB\u901A\u77E5\u7BA1\u7406\u54E1" : "\u6A21\u578B\u670D\u52D9\u66AB\u6642\u7121\u6CD5\u56DE\u61C9";
     return new Response(sse({ type: "error", message }), { status: 502, headers: { "content-type": "text/event-stream" } });
